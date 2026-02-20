@@ -1,7 +1,7 @@
-import { PERMISSION } from '@/constant';
 import { dataSource } from '../config';
 import { hash } from 'bcrypt';
-import { UserEntity } from '@/domains/user/user.entity';
+import { PERMISSION } from '../../constant';
+import { UserEntity } from '../../domains/user/user.entity';
 
 const userRepo = dataSource.getRepository(UserEntity);
 

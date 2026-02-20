@@ -1,4 +1,4 @@
-import { AUTH, PERMISSION } from '@/constant';
+import { AUTH, PERMISSION } from '../constant';
 import {
   createParamDecorator,
   ExecutionContext,

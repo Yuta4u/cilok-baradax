@@ -7,8 +7,8 @@ import { UpdateUserDto } from './dtos/update-user.dto';
 import {
   InjectRepository,
   Transactional,
-} from '@/decorators/database.decorator';
-import { PERMISSION } from '@/constant';
+} from '../../decorators/database.decorator';
+import { PERMISSION } from '../../constant';
 
 @Injectable()
 export class UserService {
@@ -63,7 +63,16 @@ export class UserService {
     manager: EntityManager,
     payload: CreateUserRequestDto,
   ) {
-    const user = await this.create(payload);
+    const userRepo = manager.getRepository(UserEntity);
+
+    const user = await userRepo.findOne({ where: { email: payload.email } });
+    if (user) {
+      throw new BadRequestException('User with this email already exists');
+    }
+
+    const newUser = await this.create(payload);
+    await manager.save(newUser);
+
     return user;
   }
 

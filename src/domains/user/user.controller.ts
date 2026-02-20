@@ -13,8 +13,8 @@ import { UserService } from './user.service';
 import { CreateUserRequestDto } from './dtos/add-user.dto';
 import { ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { UpdateUserDto } from './dtos/update-user.dto';
-import { Permission } from '@/decorators/auth.decorator';
-import { startTransaction } from '@/decorators/database.decorator';
+import { Permission } from '../../decorators/auth.decorator';
+import { startTransaction } from '../../decorators/database.decorator';
 
 @ApiBearerAuth('Authorization')
 @Controller({

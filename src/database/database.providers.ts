@@ -1,7 +1,7 @@
 import { Provider } from '@nestjs/common';
 import { dataSource } from './config';
 import { DataSource } from 'typeorm';
-import { REPOSITORY } from '@/constant';
+import { REPOSITORY } from '../constant';
 
 export const databaseProviders: Provider[] = [
   {

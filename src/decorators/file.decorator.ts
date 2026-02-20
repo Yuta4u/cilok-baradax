@@ -1,4 +1,4 @@
-import { FilePiece } from '@/interceptors/body.interceptor';
+import { FilePiece } from '../interceptors/body.interceptor';
 import {
   Validate,
   ValidationArguments,

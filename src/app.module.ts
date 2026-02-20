@@ -4,11 +4,13 @@ import { UserModule } from './domains/user/user.module';
 import { DatabaseModule } from './database/database.module';
 import { ProductModule } from './domains/product/product.module';
 import { StockHistoriesModule } from './domains/stock-histories/stock-histories.module';
+import { AuthModule } from './domains/auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     DatabaseModule,
+    AuthModule,
     UserModule,
     ProductModule,
     StockHistoriesModule,
