@@ -1,13 +1,20 @@
-import { dataSource } from '../config';
+// user.seed.ts
+import { DataSource } from 'typeorm';
 import { hash } from 'bcrypt';
-import { PERMISSION } from '../../constant';
 import { UserEntity } from '../../domains/user/user.entity';
+import { PERMISSION } from '../../constant';
 
-const userRepo = dataSource.getRepository(UserEntity);
+export async function userSeed(dataSource: DataSource) {
+  const userRepo = dataSource.getRepository(UserEntity);
 
-export async function userSeed() {
   const user = await userRepo.findOne({ where: { name: 'Admin' } });
-  if (user) return user;
+  console.log('hit');
+
+  if (user) {
+    console.log('⏭️  Skipped: Admin already exists');
+    return user;
+  }
+
   const newUser = await userRepo.save(
     userRepo.create({
       name: 'Admin',
@@ -17,5 +24,6 @@ export async function userSeed() {
     }),
   );
 
+  console.log('✅ Seeded: Admin');
   return newUser;
 }

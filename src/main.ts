@@ -8,6 +8,8 @@ import {
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { BodyInterceptor } from './interceptors/body.interceptor';
 import { ValidationPipe } from './pipes/validation.pipe';
+import { DataSource } from 'typeorm';
+import { userSeed } from './database/seeds/user.seed';
 
 async function bootstrap() {
   const adapter = new FastifyAdapter();
@@ -42,6 +44,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   await app.listen(3000, '0.0.0.0');
+
+  // ── Auto Seeder ─────────────────────────────
+  const dataSource = app.get(DataSource);
+  await userSeed(dataSource);
 }
 
 void bootstrap();

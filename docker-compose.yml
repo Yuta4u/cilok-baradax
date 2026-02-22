@@ -36,7 +36,8 @@ services:
     ports:
       - '3000:3000' # Expose ke public
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - cilok-baradax
     volumes:
