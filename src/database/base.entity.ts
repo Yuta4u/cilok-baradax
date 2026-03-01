@@ -45,13 +45,13 @@ export class BaseParams {
 
   @IsString()
   @IsOptional()
-  public uom?: string;
-
-  @IsString()
-  @IsOptional()
   public sd?: string;
 
   @IsString()
   @IsOptional()
   public ed?: string;
+
+  @IsString()
+  @IsOptional()
+  public type?: 'INCOME' | 'EXPENSE';
 }

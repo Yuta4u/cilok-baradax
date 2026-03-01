@@ -30,11 +30,35 @@ export class UserController {
     return users;
   }
 
+  @Get('/all')
+  public async getAll() {
+    const res = await this.userService.getAll();
+    return res;
+  }
+
+  @Post('/active/:id')
+  public async setActive(
+    @Param('id') id: string,
+    @Body('active') active: number,
+  ) {
+    const res = await startTransaction(
+      this.userService,
+      'setActiveTransaction',
+      id,
+      active,
+    );
+    return res;
+  }
+
   @Permission(['SUPER_USER'])
   @Post()
   public async create(@Body() payload: CreateUserRequestDto) {
-    await this.userService.create(payload);
-    return 'Successfully! create user';
+    const res = await startTransaction(
+      this.userService,
+      'createTransaction',
+      payload,
+    );
+    return res;
   }
 
   @Permission(['SUPER_USER'])
@@ -55,16 +79,6 @@ export class UserController {
   public async delete(@Param('id') id: string) {
     await this.userService.delete(id);
     return 'Successfully! delete User';
-  }
-
-  @Post('/user')
-  public async addUser(@Body() payload: CreateUserRequestDto) {
-    const res = await startTransaction(
-      this.userService,
-      'addUserTransaction',
-      payload,
-    );
-    return res;
   }
 
   @Get('/search')
