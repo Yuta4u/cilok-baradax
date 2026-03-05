@@ -6,6 +6,7 @@ import { ProductModule } from './domains/product/product.module';
 import { StockHistoriesModule } from './domains/stock-histories/stock-histories.module';
 import { AuthModule } from './domains/auth/auth.module';
 import CashFlowModule from './domains/cash-flows/cash-flow.module';
+import { IngredientModule } from './domains/ingredients/ingredient.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import CashFlowModule from './domains/cash-flows/cash-flow.module';
     AuthModule,
     UserModule,
     ProductModule,
+    IngredientModule,
     StockHistoriesModule,
     CashFlowModule,
   ],

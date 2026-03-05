@@ -1,22 +1,21 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, ILike } from 'typeorm';
 import { BaseParams } from '../../database/base.entity';
-import { ProductEntity } from './product.entity';
+import { IngredientEntity } from './ingredient.entity';
+import { AddIngredientDto } from './dtos/add.dto';
 import { Transactional } from '../../decorators/database.decorator';
-import { AddProductDto } from './dtos/add.dto';
-import { UpdateStockDto } from '../ingredients/dtos/update-stock.dto';
+import { UpdateStockDto } from './dtos/update-stock.dto';
 
 @Injectable()
-export class ProductService {
+export class IngredientService {
   public constructor(private readonly dataSource: DataSource) {}
 
-  public getAll(query: BaseParams) {
-    const productRepo = this.dataSource.getRepository(ProductEntity);
-
+  public async getAll(query: BaseParams) {
+    const repo = this.dataSource.getRepository(IngredientEntity);
     const page = Math.max(1, parseInt(query.page) || 1);
     const limit = Math.max(1, parseInt(query.limit) || 10);
 
-    return productRepo.find({
+    return repo.find({
       order: { createdAt: 'DESC' },
       where: {
         name: ILike(`%${query.q}%`),
@@ -25,37 +24,40 @@ export class ProductService {
   }
 
   @Transactional('dataSource')
-  public async addTransaction(manager: EntityManager, payload: AddProductDto) {
-    const productRepo = manager.getRepository(ProductEntity);
+  public async addTransaction(
+    manager: EntityManager,
+    payload: AddIngredientDto,
+  ) {
+    const ingredientRepo = manager.getRepository(IngredientEntity);
 
-    const exist = await productRepo.findOne({
+    const exist = await ingredientRepo.findOne({
       where: {
         name: payload.name,
       },
     });
 
     if (exist) {
-      throw new BadRequestException('Product already exists');
+      throw new BadRequestException('Ingredient already exists');
     }
 
-    const product = productRepo.create(payload);
-    await productRepo.save(product);
+    const ingredient = ingredientRepo.create(payload);
+    await ingredientRepo.save(ingredient);
 
     return {
-      message: 'Successfully! add product',
+      message: 'Successfully! add ingredient',
       success: true,
       statusCode: 200,
     };
   }
 
   @Transactional('dataSource')
-  public async updateStockProductTransaction(
+  public async updateStockIngredientTransaction(
     manager: EntityManager,
     id: string,
     payload: UpdateStockDto,
   ) {
-    const productRepo = manager.getRepository(ProductEntity);
-    const exist = await productRepo.findOne({
+    const ingredientRepo = manager.getRepository(IngredientEntity);
+    const exist = await ingredientRepo.findOne({
       where: {
         id: id,
       },
@@ -71,12 +73,12 @@ export class ProductService {
       throw new BadRequestException('Quantity is not enough');
     }
     if (!exist) {
-      throw new BadRequestException('Product not found');
+      throw new BadRequestException('Ingredient not found');
     }
 
-    await productRepo.save(exist);
+    await ingredientRepo.save(exist);
     return {
-      message: 'Successfully! update stock product',
+      message: 'Successfully! update stock ingredient',
       success: true,
       statusCode: 200,
     };

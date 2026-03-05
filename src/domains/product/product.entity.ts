@@ -9,10 +9,14 @@ export class ProductEntity extends BaseEntity {
   public name!: string;
 
   @Column({
+    name: 'uom',
+    type: 'varchar',
+  })
+  public uom!: string;
+
+  @Column({
     name: 'stock',
-    type: 'numeric',
-    precision: 15,
-    scale: 2,
+    type: 'int',
     default: 0,
   })
   public stock!: number;
