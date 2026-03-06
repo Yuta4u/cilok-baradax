@@ -45,4 +45,18 @@ export class IngredientController {
     );
     return res;
   }
+
+  @Put('/minimal-stock/:id')
+  public async updateMinimalStockProduct(
+    @Param('id') id: string,
+    @Body() payload: { minimalStock: number },
+  ) {
+    const res = await startTransaction(
+      this.ingredientService,
+      'updateMinimalStockTransaction',
+      id,
+      payload.minimalStock,
+    );
+    return res;
+  }
 }

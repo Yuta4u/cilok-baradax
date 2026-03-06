@@ -21,6 +21,13 @@ export class UserEntity extends BaseEntity {
   })
   public password!: string;
 
+  @Column({
+    name: 'stock_cilok',
+    type: 'int',
+    default: 0,
+  })
+  public stockCilok!: number;
+
   //permission
   @Column({
     name: 'permission',

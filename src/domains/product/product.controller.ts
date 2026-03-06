@@ -29,7 +29,7 @@ export class ProductController {
     return res;
   }
 
-  @Put('/:id')
+  @Put('/stock/:id')
   public async updateStockProduct(
     @Param('id') id: string,
     @Body() payload: UpdateStockDto,

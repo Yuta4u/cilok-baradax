@@ -10,18 +10,20 @@ import { UpdateStockDto } from '../ingredients/dtos/update-stock.dto';
 export class ProductService {
   public constructor(private readonly dataSource: DataSource) {}
 
-  public getAll(query: BaseParams) {
+  public async getAll(query: BaseParams) {
     const productRepo = this.dataSource.getRepository(ProductEntity);
 
-    const page = Math.max(1, parseInt(query.page) || 1);
-    const limit = Math.max(1, parseInt(query.limit) || 10);
+    // const page = Math.max(1, parseInt(query.page) || 1);
+    // const limit = Math.max(1, parseInt(query.limit) || 10);
 
-    return productRepo.find({
+    const result = await productRepo.find({
       order: { createdAt: 'DESC' },
       where: {
         name: ILike(`%${query.q}%`),
       },
     });
+
+    return result;
   }
 
   @Transactional('dataSource')

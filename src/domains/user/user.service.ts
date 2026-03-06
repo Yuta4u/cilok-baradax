@@ -45,26 +45,11 @@ export class UserService {
     active: number,
   ) {
     const userRepo = manager.getRepository(UserEntity);
-    console.log(id, active, 'test');
 
     if (active) {
-      await userRepo.update(
-        {
-          id,
-        },
-        {
-          deletedAt: new Date(),
-        },
-      );
+      await userRepo.recover({ id });
     } else {
-      await userRepo.update(
-        {
-          id,
-        },
-        {
-          deletedAt: null,
-        },
-      );
+      await userRepo.softDelete({ id });
     }
     return {
       message: 'Successfully! update user',
@@ -145,22 +130,61 @@ export class UserService {
   }
 
   public async getAll() {
-    const userRepo = await this.dataSource
-      .getRepository(UserEntity)
-      .createQueryBuilder('u')
-      .select([
-        'u.id as id',
-        'u.name as name',
-        'u.email as email',
-        'u.permission as permission',
-        'u.deletedAt IS NULL as active',
-      ])
-      .withDeleted()
-      .getRawMany();
+    const userRepo = this.dataSource.getRepository(UserEntity);
+
+    const result = await userRepo.find({
+      withDeleted: true,
+      order: {
+        createdAt: 'DESC',
+      },
+    });
 
     return {
       message: 'Successfully! get all user',
-      data: userRepo,
+      data: result,
+      success: true,
+      statusCode: 200,
+    };
+  }
+
+  public async getAllKaryawan() {
+    const userRepo = this.dataSource.getRepository(UserEntity);
+
+    const result = await userRepo.find({
+      where: {
+        permission: PERMISSION.KARYAWAN,
+        deletedAt: null,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    return result;
+  }
+
+  @Transactional('dataSource')
+  public async updateStockCilokTransaction(
+    manager: EntityManager,
+    id: string,
+    quantity: number,
+  ) {
+    const userRepo = manager.getRepository(UserEntity);
+
+    if (!quantity) {
+      throw new BadRequestException('Quantity is required');
+    }
+
+    await userRepo.increment(
+      {
+        id,
+      },
+      'stockCilok',
+      quantity,
+    );
+
+    return {
+      message: 'Successfully! update stock cilok user',
       success: true,
       statusCode: 200,
     };

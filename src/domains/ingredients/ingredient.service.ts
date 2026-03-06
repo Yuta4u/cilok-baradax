@@ -83,4 +83,24 @@ export class IngredientService {
       statusCode: 200,
     };
   }
+
+  @Transactional('dataSource')
+  public async updateMinimalStockTransaction(
+    manager: EntityManager,
+    id: string,
+    minimalStock: number,
+  ) {
+    const ingredientRepo = manager.getRepository(IngredientEntity);
+
+    if (!minimalStock) {
+      throw new BadRequestException('Minimal stock is required');
+    }
+
+    await ingredientRepo.update(id, { minimalStock });
+    return {
+      message: 'Successfully! update minimal stock ingredient',
+      success: true,
+      statusCode: 200,
+    };
+  }
 }

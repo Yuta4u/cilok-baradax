@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
+  Put,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserRequestDto } from './dtos/add-user.dto';
@@ -33,6 +34,12 @@ export class UserController {
   @Get('/all')
   public async getAll() {
     const res = await this.userService.getAll();
+    return res;
+  }
+
+  @Get('/karyawan')
+  public async getAllKaryawan() {
+    const res = await this.userService.getAllKaryawan();
     return res;
   }
 
@@ -87,5 +94,19 @@ export class UserController {
     @Query('pointer', new ParseUUIDPipe({ optional: true })) pointer?: string,
   ) {
     return this.userService.find(pointer, query);
+  }
+
+  @Put('/stock-cilok/:id')
+  public async updateStockCilok(
+    @Param('id') id: string,
+    @Body() payload: { quantity: number },
+  ) {
+    const res = await startTransaction(
+      this.userService,
+      'updateStockCilokTransaction',
+      id,
+      payload.quantity,
+    );
+    return res;
   }
 }

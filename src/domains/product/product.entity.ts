@@ -15,6 +15,12 @@ export class ProductEntity extends BaseEntity {
   public uom!: string;
 
   @Column({
+    name: 'icon',
+    type: 'varchar',
+  })
+  public icon!: string;
+
+  @Column({
     name: 'stock',
     type: 'int',
     default: 0,
