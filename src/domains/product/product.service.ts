@@ -1,86 +1,59 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, ILike } from 'typeorm';
-import { BaseParams } from '../../database/base.entity';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource, EntityManager, Transaction } from 'typeorm';
 import { ProductEntity } from './product.entity';
 import { Transactional } from '../../decorators/database.decorator';
-import { AddProductDto } from './dtos/add.dto';
-import { UpdateStockDto } from '../ingredients/dtos/update-stock.dto';
+import { UpdateStock } from './dtos/update-stock.dto';
 
 @Injectable()
 export class ProductService {
   public constructor(private readonly dataSource: DataSource) {}
 
-  public async getAll(query: BaseParams) {
+  public async getAll() {
     const productRepo = this.dataSource.getRepository(ProductEntity);
 
-    // const page = Math.max(1, parseInt(query.page) || 1);
-    // const limit = Math.max(1, parseInt(query.limit) || 10);
-
-    const result = await productRepo.find({
-      order: { createdAt: 'DESC' },
-      where: {
-        name: ILike(`%${query.q}%`),
-      },
-    });
+    const result = await productRepo.find();
 
     return result;
   }
 
   @Transactional('dataSource')
-  public async addTransaction(manager: EntityManager, payload: AddProductDto) {
-    const productRepo = manager.getRepository(ProductEntity);
-
-    const exist = await productRepo.findOne({
-      where: {
-        name: payload.name,
-      },
-    });
-
-    if (exist) {
-      throw new BadRequestException('Product already exists');
-    }
-
-    const product = productRepo.create(payload);
-    await productRepo.save(product);
-
-    return {
-      message: 'Successfully! add product',
-      success: true,
-      statusCode: 200,
-    };
-  }
-
-  @Transactional('dataSource')
-  public async updateStockProductTransaction(
+  public async updateStockTransaction(
     manager: EntityManager,
-    id: string,
-    payload: UpdateStockDto,
+    payload: UpdateStock,
   ) {
     const productRepo = manager.getRepository(ProductEntity);
-    const exist = await productRepo.findOne({
-      where: {
-        id: id,
-      },
+
+    const product = await productRepo.findOne({
+      where: { id: payload.id },
+      select: ['id', 'stock'],
     });
 
-    if (payload.type) {
-      exist.stock = Number(exist.stock) + payload.quantity;
-    } else {
-      exist.stock = Number(exist.stock) - payload.quantity;
+    if (!product) {
+      throw new NotFoundException('Produk tidak ditemukan');
     }
 
-    if (exist.stock < 0) {
-      throw new BadRequestException('Quantity is not enough');
-    }
-    if (!exist) {
-      throw new BadRequestException('Product not found');
+    if (payload.type === 'dec' && product.stock < payload.quantity) {
+      console.log(product.stock, payload.quantity);
+
+      throw new BadRequestException(
+        `Stok tidak mencukupi. Stok tersedia: ${product.stock}, dibutuhkan: ${payload.quantity}`,
+      );
     }
 
-    await productRepo.save(exist);
-    return {
-      message: 'Successfully! update stock product',
-      success: true,
-      statusCode: 200,
-    };
+    await productRepo
+      .createQueryBuilder()
+      .update(ProductEntity)
+      .set({
+        stock: () =>
+          payload.type === 'inc'
+            ? `stock + ${payload.quantity}`
+            : `stock - ${payload.quantity}`,
+      })
+      .where('id = :id', { id: payload.id })
+      .execute();
   }
 }

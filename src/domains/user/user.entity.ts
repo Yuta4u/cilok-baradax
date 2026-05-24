@@ -1,5 +1,6 @@
 import { BaseEntity } from '../../database/base.entity';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
+import { CashFlowEntity } from '../cash-flow/cash-flow.entity';
 
 @Entity({
   name: 'users',
@@ -39,4 +40,7 @@ export class UserEntity extends BaseEntity {
     },
   })
   public permission!: number;
+
+  @OneToMany(() => CashFlowEntity, (cashFlow) => cashFlow.user)
+  public cashFlows!: CashFlowEntity[];
 }

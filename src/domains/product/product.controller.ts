@@ -1,10 +1,8 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { ProductService } from './product.service';
-import { BaseParams } from '../../database/base.entity';
-import { AddProductDto } from './dtos/add.dto';
+import { UpdateStock } from './dtos/update-stock.dto';
 import { startTransaction } from '../../decorators/database.decorator';
-import { UpdateStockDto } from '../ingredients/dtos/update-stock.dto';
 
 @ApiBearerAuth('Authorization')
 @Controller({
@@ -14,30 +12,16 @@ export class ProductController {
   public constructor(private readonly productService: ProductService) {}
 
   @Get()
-  public async getAll(@Query() query: BaseParams) {
-    const res = await this.productService.getAll(query);
+  public async getAll() {
+    const res = await this.productService.getAll();
     return res;
   }
 
-  @Post()
-  public async addProduct(@Body() payload: AddProductDto) {
+  @Put('/stock')
+  public async updateStock(@Body() payload: UpdateStock) {
     const res = await startTransaction(
       this.productService,
-      'addTransaction',
-      payload,
-    );
-    return res;
-  }
-
-  @Put('/stock/:id')
-  public async updateStockProduct(
-    @Param('id') id: string,
-    @Body() payload: UpdateStockDto,
-  ) {
-    const res = await startTransaction(
-      this.productService,
-      'updateStockProductTransaction',
-      id,
+      'updateStockTransaction',
       payload,
     );
     return res;

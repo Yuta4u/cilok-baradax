@@ -1,13 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, ILike, Repository } from 'typeorm';
+import { DataSource, EntityManager, ILike } from 'typeorm';
 import { UserEntity } from './user.entity';
 import bcrypt from 'bcrypt';
 import { CreateUserRequestDto } from './dtos/add-user.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
-import {
-  InjectRepository,
-  Transactional,
-} from '../../decorators/database.decorator';
+import { Transactional } from '../../decorators/database.decorator';
 import { PERMISSION } from '../../constant';
 
 @Injectable()
@@ -153,7 +150,7 @@ export class UserService {
     const result = await userRepo.find({
       where: {
         permission: PERMISSION.KARYAWAN,
-        deletedAt: null,
+        deletedAt: undefined,
       },
       order: {
         createdAt: 'DESC',

@@ -1,19 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
-export class AddCashFlowDto {
+export class UpdateStock {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  public id!: string;
+
   @ApiProperty()
   @IsNumber()
   @IsNotEmpty()
-  public amount!: number;
+  public quantity!: number;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  public type!: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  public note!: string;
+  public type!: 'inc' | 'dec';
 }

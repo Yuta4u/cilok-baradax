@@ -43,7 +43,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new BodyInterceptor());
   app.setGlobalPrefix('api');
 
-  await app.listen(3000, '0.0.0.0');
+  await app.listen(4001, '0.0.0.0');
 
   // ── Auto Seeder ─────────────────────────────
   const dataSource = app.get(DataSource);
