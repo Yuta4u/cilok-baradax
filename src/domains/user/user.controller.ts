@@ -1,18 +1,7 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Patch,
-  Post,
-  Param,
-  Query,
-  ParseUUIDPipe,
-  Put,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Param, Put } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserRequestDto } from './dtos/add-user.dto';
-import { ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { Permission } from '../../decorators/auth.decorator';
 import { startTransaction } from '../../decorators/database.decorator';
@@ -24,22 +13,23 @@ import { startTransaction } from '../../decorators/database.decorator';
 export class UserController {
   public constructor(private readonly userService: UserService) {}
 
-  @Permission(['SUPER_USER'])
-  @Get()
-  public async retrieve() {
-    const users = await this.userService.read();
-    return users;
-  }
-
   @Get('/all')
   public async getAll() {
-    const res = await this.userService.getAll();
+    const res = await this.userService.getAllUsers();
     return res;
   }
 
-  @Get('/karyawan')
-  public async getAllKaryawan() {
-    const res = await this.userService.getAllKaryawan();
+  @Put('/change-password')
+  public async changePassword(
+    @Body() payload: { id: string; password: string },
+  ) {
+    console.log(payload, 'ini payload');
+
+    const res = await startTransaction(
+      this.userService,
+      'changePasswordTransaction',
+      payload,
+    );
     return res;
   }
 
@@ -73,27 +63,6 @@ export class UserController {
   public async update(@Body() userUpdateDto: UpdateUserDto) {
     await this.userService.update(userUpdateDto);
     return 'Successfully! update User';
-  }
-
-  @Permission(['SUPER_USER'])
-  @Delete(':id')
-  @ApiParam({
-    name: 'id',
-    required: true,
-    format: 'uuid',
-    description: 'ID of the user to delete',
-  })
-  public async delete(@Param('id') id: string) {
-    await this.userService.delete(id);
-    return 'Successfully! delete User';
-  }
-
-  @Get('/search')
-  public async find(
-    @Query('query') query: string,
-    @Query('pointer', new ParseUUIDPipe({ optional: true })) pointer?: string,
-  ) {
-    return this.userService.find(pointer, query);
   }
 
   @Put('/stock-cilok/:id')

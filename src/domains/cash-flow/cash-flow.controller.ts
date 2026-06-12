@@ -24,6 +24,18 @@ export class CashFlowController {
     return res;
   }
 
+  @Get('/dashboard')
+  public async getDashboard() {
+    const res = await this.cashFlowService.getDashboard();
+    return res;
+  }
+
+  @Get('/cabang/today')
+  public async getCabangToday() {
+    const res = await this.cashFlowService.getCabangToday();
+    return res;
+  }
+
   @Get('/:id')
   public async getById(@Param('id') id: string) {
     const res = await this.cashFlowService.getById(id);

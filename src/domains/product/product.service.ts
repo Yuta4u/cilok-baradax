@@ -3,23 +3,100 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, Transaction } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  QueryFailedError,
+  Transaction,
+} from 'typeorm';
 import { ProductEntity } from './product.entity';
 import { Transactional } from '../../decorators/database.decorator';
 import { UpdateStock } from './dtos/update-stock.dto';
+import { AddProductDto } from './dtos/add-product.dto';
 
 @Injectable()
 export class ProductService {
   public constructor(private readonly dataSource: DataSource) {}
 
-  public async getAll() {
+  public async getAll(type: 'Semua' | 'Aman' | 'Menipis', q?: string) {
     const productRepo = this.dataSource.getRepository(ProductEntity);
 
-    const result = await productRepo.find();
+    const qb = productRepo
+      .createQueryBuilder('p')
+      .select([
+        'p.id as id',
+        'p.name as name',
+        'p.stock as stock',
+        'p.minimalStock as minimalStock',
+        'p.uom as uom',
+        'CASE WHEN p.stock >= p.minimalStock THEN true ELSE false END as status',
+      ]);
 
-    return result;
+    if (q) {
+      qb.where('p.name ILIKE :q', { q: `%${q}%` });
+    }
+    if (type === 'Aman') {
+      console.log('hit aman');
+
+      qb.andWhere('p.stock >= p.minimalStock');
+    }
+
+    if (type === 'Menipis') {
+      console.log('hit menipis');
+
+      qb.andWhere('p.stock < p.minimalStock');
+    }
+
+    const result = await qb.getRawMany();
+
+    return {
+      message: 'Successfully! get products',
+      statusCode: 200,
+      success: true,
+      data: result,
+    };
   }
 
+  @Transactional('dataSource')
+  public async addProductTransaction(
+    manager: EntityManager,
+    payload: AddProductDto,
+  ) {
+    const productRepo = manager.getRepository(ProductEntity);
+
+    const existing = await productRepo.findOne({
+      where: { name: payload.name },
+    });
+
+    if (existing) {
+      throw new Error('Product already exists');
+    }
+
+    try {
+      const product = productRepo.create({
+        ...payload,
+        uom: 'PCS',
+      });
+
+      const saved = await productRepo.save(product);
+
+      return saved;
+    } catch (error) {
+      if (error instanceof QueryFailedError) {
+        const dbError = error as any;
+
+        if (dbError.code === '23505') {
+          throw new Error('Product already exists');
+        }
+
+        if (dbError.code === 'ER_DUP_ENTRY') {
+          throw new Error('Product already exists');
+        }
+      }
+
+      throw error;
+    }
+  }
   @Transactional('dataSource')
   public async updateStockTransaction(
     manager: EntityManager,

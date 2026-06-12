@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { ProductService } from './product.service';
 import { UpdateStock } from './dtos/update-stock.dto';
 import { startTransaction } from '../../decorators/database.decorator';
+import { AddProductDto } from './dtos/add-product.dto';
 
 @ApiBearerAuth('Authorization')
 @Controller({
@@ -12,8 +13,21 @@ export class ProductController {
   public constructor(private readonly productService: ProductService) {}
 
   @Get()
-  public async getAll() {
-    const res = await this.productService.getAll();
+  public async getAll(
+    @Query('type') type: 'Semua' | 'Aman' | 'Menipis',
+    @Query('q') q?: string,
+  ) {
+    const res = await this.productService.getAll(type, q);
+    return res;
+  }
+
+  @Post()
+  public async addProduct(@Body() payload: AddProductDto) {
+    const res = await startTransaction(
+      this.productService,
+      'addProductTransaction',
+      payload,
+    );
     return res;
   }
 

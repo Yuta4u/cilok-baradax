@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Between, DataSource, EntityManager, In } from 'typeorm';
+import { Between, DataSource, EntityManager, ILike, In } from 'typeorm';
 import { Transactional } from '../../decorators/database.decorator';
 import { AddCashFlowDto } from './dtos/create.dto';
 import { CashFlowEntity } from './cash-flow.entity';
@@ -14,6 +14,7 @@ import { CashFlowItemEntity } from '../cash-flow-item/cash-flow-item.entity';
 import { AddReportDto } from './dtos/add-report.dto';
 import { ProductService } from '../product/product.service';
 import { ConfirmReportDto } from './dtos/confirmation.dto';
+import { UserEntity } from '../user/user.entity';
 
 @Injectable()
 export class CashFlowService {
@@ -22,6 +23,75 @@ export class CashFlowService {
     private readonly userService: UserService,
     private readonly productService: ProductService,
   ) {}
+
+  public async getDashboard() {
+    const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const [totalTransaksi, omsetHariIni] = await Promise.all([
+      cashFlowRepo.count(),
+      cashFlowRepo
+        .createQueryBuilder('cf')
+        .select('COALESCE(SUM(cf.in), 0)', 'totalOmset')
+        .where('cf.createdAt BETWEEN :start AND :end', {
+          start: startOfDay,
+          end: endOfDay,
+        })
+        .getRawOne(),
+    ]);
+
+    return {
+      message: 'Successfully! get dashboard',
+      statusCode: 200,
+      success: true,
+      data: {
+        totalTransaksi,
+        omsetHariIni: Number(omsetHariIni.totalOmset),
+      },
+    };
+  }
+
+  public async getCabangToday() {
+    const userRepo = this.dataSource.getRepository(UserEntity);
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const result = await userRepo
+      .createQueryBuilder('u')
+      .leftJoin('u.cashFlows', 'cf', 'cf.createdAt BETWEEN :start AND :end', {
+        start: startOfDay,
+        end: endOfDay,
+      })
+      .select([
+        'u.id AS id',
+        'u.name AS name',
+        'COUNT(cf.id) AS totalTransaksi',
+        'COALESCE(SUM(cf.in), 0) AS totalOmset',
+        'MAX(u.deletedAt) AS deletedAt',
+      ])
+      .where('u.permission = :permission', {
+        permission: 4,
+      })
+      .groupBy('u.id')
+      .addGroupBy('u.name')
+      .getRawMany();
+
+    return {
+      message: 'Successfully! get cabang today',
+      statusCode: 200,
+      success: true,
+      data: result,
+    };
+  }
 
   public async getAll(query: BaseParams, sub: string) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity); // tidak perlu await
@@ -45,7 +115,7 @@ export class CashFlowService {
         'cf.verified as verified',
       ]);
 
-    if (user.permission & PERMISSION.KARYAWAN) {
+    if (user.permission & PERMISSION.CABANG) {
       qb.andWhere('u.id = :id', { id: sub });
     }
 

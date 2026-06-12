@@ -25,6 +25,6 @@ export class UpdateUserDto {
 
   @ApiProperty()
   @IsOptional()
-  @IsEnum(['SUPER_USER', 'ADMIN', 'KARYAWAN'], { each: true })
-  public permission?: ('SUPER_USER' | 'ADMIN' | 'KARYAWAN')[];
+  @IsEnum(['SUPER_USER', 'ADMIN', 'CABANG'], { each: true })
+  public permission?: ('SUPER_USER' | 'ADMIN' | 'CABANG')[];
 }

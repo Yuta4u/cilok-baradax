@@ -11,6 +11,7 @@ import { PERMISSION } from '../../constant';
 export class UserService {
   public constructor(private readonly dataSource: DataSource) {}
 
+  // $$
   @Transactional('dataSource')
   public async createTransaction(
     manager: EntityManager,
@@ -55,13 +56,19 @@ export class UserService {
     };
   }
 
-  public read() {
-    const userRepo = this.dataSource.getRepository(UserEntity);
-    return userRepo.find({
-      order: {
-        createdAt: 'DESC',
-      },
-    });
+  @Transactional('dataSource')
+  public async changePasswordTransaction(
+    manager: EntityManager,
+    payload: { id: string; password: string },
+  ) {
+    const userRepo = manager.getRepository(UserEntity);
+    const user = await userRepo.findOne({ where: { id: payload.id } });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    user.password = await bcrypt.hash(payload.password, 10);
+    return userRepo.save(user);
   }
 
   public async update({ id, ...userUpdateDto }: UpdateUserDto) {
@@ -78,11 +85,6 @@ export class UserService {
       },
     );
     return user;
-  }
-
-  public async delete(id: string) {
-    const userRepo = this.dataSource.getRepository(UserEntity);
-    await userRepo.softDelete({ id });
   }
 
   private aggPermission(permissions: (keyof typeof PERMISSION)[]) {
@@ -104,37 +106,11 @@ export class UserService {
     });
   }
 
-  public async find(_: string | undefined, query: string) {
-    const userRepo = this.dataSource.getRepository(UserEntity);
-    const results = await userRepo.find({
-      where: {
-        name: ILike(`%${query}%`),
-      },
-      order: {
-        id: 'DESC',
-      },
-      select: {
-        name: true,
-        id: true,
-      },
-      take: 20,
-    });
-    const mapped = {} as Record<string, UserEntity>;
-    for (const result of results) {
-      mapped[result.id] = result;
-    }
-    return mapped;
-  }
-
-  public async getAll() {
+  // $$
+  public async getAllUsers() {
     const userRepo = this.dataSource.getRepository(UserEntity);
 
-    const result = await userRepo.find({
-      withDeleted: true,
-      order: {
-        createdAt: 'DESC',
-      },
-    });
+    const result = await userRepo.find();
 
     return {
       message: 'Successfully! get all user',
@@ -142,22 +118,6 @@ export class UserService {
       success: true,
       statusCode: 200,
     };
-  }
-
-  public async getAllKaryawan() {
-    const userRepo = this.dataSource.getRepository(UserEntity);
-
-    const result = await userRepo.find({
-      where: {
-        permission: PERMISSION.KARYAWAN,
-        deletedAt: undefined,
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-    });
-
-    return result;
   }
 
   @Transactional('dataSource')
