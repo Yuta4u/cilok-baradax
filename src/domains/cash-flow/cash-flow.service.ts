@@ -15,6 +15,7 @@ import { AddReportDto } from './dtos/add-report.dto';
 import { ProductService } from '../product/product.service';
 import { ConfirmReportDto } from './dtos/confirmation.dto';
 import { UserEntity } from '../user/user.entity';
+import { ProductEntity } from '../product/product.entity';
 
 @Injectable()
 export class CashFlowService {
@@ -90,6 +91,52 @@ export class CashFlowService {
       statusCode: 200,
       success: true,
       data: result,
+    };
+  }
+
+  public async getCabangTodayDetail(id: string) {
+    const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
+    const cashFlowItemRepo = this.dataSource.getRepository(CashFlowItemEntity);
+
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    const cashFlow = await cashFlowRepo
+      .createQueryBuilder('c')
+      .leftJoin('c.user', 'u')
+      .select(['c.id AS id'])
+      .where('c.created_at >= :startDate', { startDate })
+      .andWhere('c.created_at <= :endDate', { endDate })
+      .andWhere('u.id = :id', { id })
+      .getRawOne();
+
+    if (!cashFlow) {
+      return {
+        message: 'Successfully! get cabang today',
+        statusCode: 200,
+        success: true,
+        data: [],
+      };
+    }
+
+    const cashFlowItem = await cashFlowItemRepo
+      .createQueryBuilder('cfi')
+      .leftJoin('cfi.cashFlow', 'cf')
+      .leftJoin('cfi.product', 'p')
+      .select(['cfi.id AS id', 'cfi.in AS in', 'p.name AS name'])
+      .where('cf.id = :cashFlowId', { cashFlowId: cashFlow.id })
+      .getRawMany();
+
+    console.log(cashFlowItem, 'test');
+
+    return {
+      message: 'Successfully! get cabang today',
+      statusCode: 200,
+      success: true,
+      data: cashFlowItem,
     };
   }
 
@@ -261,29 +308,19 @@ export class CashFlowService {
   }
 
   @Transactional('dataSource')
-  public async addTransaction(manager: EntityManager, payload: AddCashFlowDto) {
+  public async addCashFlowTransaction(
+    manager: EntityManager,
+    payload: AddCashFlowDto,
+  ) {
     const cashFlowRepo = manager.getRepository(CashFlowEntity);
     const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
+    const productRepo = manager.getRepository(ProductEntity);
 
-    const now = new Date();
-    const startOfDay = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      0,
-      0,
-      0,
-      0,
-    );
-    const endOfDay = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      23,
-      59,
-      59,
-      999,
-    );
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
     const exist = await cashFlowRepo.findOne({
       where: {
@@ -299,50 +336,131 @@ export class CashFlowService {
     }
 
     const cashFlow = cashFlowRepo.create({
-      in: 0,
-      out: 0,
       user: {
         id: payload.id,
       },
+      verified: 2,
+      in: 0,
+      out: 0,
     });
-    await cashFlowRepo.save(cashFlow);
 
-    const cashFlowItemsObj = [];
+    await manager.save(cashFlow);
 
-    for (const [productId, { price, qty }] of Object.entries(
-      payload.cashFlowItems,
-    )) {
+    const product = await productRepo.find();
+
+    const cashFlowItemObj = [];
+
+    for (const p of product) {
+      const { qty, price } = payload.cashFlowItems[p.id] as never;
+
+      cashFlowItemObj.push(
+        cashFlowItemRepo.create({
+          product: {
+            id: p.id,
+          },
+          in: qty ? Number(qty) : 0,
+          price: price ? price : 0,
+          cashFlow: {
+            id: cashFlow.id,
+          },
+        }),
+      );
+
       await this.productService.updateStockTransaction(manager, {
-        id: productId,
+        id: p.id,
         type: 'dec',
         quantity: qty,
       });
-      const cashFlowItem = cashFlowItemRepo.create({
-        cashFlow: { id: cashFlow.id },
-        product: { id: productId },
-        ['in']: qty,
-        price,
-      });
-      cashFlowItemsObj.push(cashFlowItem);
     }
-    await cashFlowItemRepo.save(cashFlowItemsObj);
 
-    // const newCashFlowItems = Object.entries(payload.cashFlowItems).map(
-    //   ([productId, { price, qty }]) =>
-    //     cashFlowItemRepo.create({
-    //       cashFlow: { id: cashFlow.id },
-    //       product: { id: productId },
-    //       in: qty,
-    //       price,
-    //     }),
-    // );
+    await manager.save(cashFlowItemObj);
 
-    return {
-      message: 'Successfully added cash flow',
-      success: true,
-      statusCode: 200,
-    };
+    return cashFlow;
   }
+
+  // @Transactional('dataSource')
+  // public async addTransaction(manager: EntityManager, payload: AddCashFlowDto) {
+  //   const cashFlowRepo = manager.getRepository(CashFlowEntity);
+  //   const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
+
+  //   const now = new Date();
+  //   const startOfDay = new Date(
+  //     now.getFullYear(),
+  //     now.getMonth(),
+  //     now.getDate(),
+  //     0,
+  //     0,
+  //     0,
+  //     0,
+  //   );
+  //   const endOfDay = new Date(
+  //     now.getFullYear(),
+  //     now.getMonth(),
+  //     now.getDate(),
+  //     23,
+  //     59,
+  //     59,
+  //     999,
+  //   );
+
+  //   const exist = await cashFlowRepo.findOne({
+  //     where: {
+  //       user: {
+  //         id: payload.id,
+  //       },
+  //       createdAt: Between(startOfDay, endOfDay),
+  //     },
+  //   });
+
+  //   if (exist) {
+  //     throw new BadRequestException('Cash flow already exists today');
+  //   }
+
+  //   const cashFlow = cashFlowRepo.create({
+  //     in: 0,
+  //     out: 0,
+  //     user: {
+  //       id: payload.id,
+  //     },
+  //   });
+  //   await cashFlowRepo.save(cashFlow);
+
+  //   const cashFlowItemsObj = [];
+
+  //   for (const [productId, { price, qty }] of Object.entries(
+  //     payload.cashFlowItems,
+  //   )) {
+  //     await this.productService.updateStockTransaction(manager, {
+  //       id: productId,
+  //       type: 'dec',
+  //       quantity: qty,
+  //     });
+  //     const cashFlowItem = cashFlowItemRepo.create({
+  //       cashFlow: { id: cashFlow.id },
+  //       product: { id: productId },
+  //       ['in']: qty,
+  //       price,
+  //     });
+  //     cashFlowItemsObj.push(cashFlowItem);
+  //   }
+  //   await cashFlowItemRepo.save(cashFlowItemsObj);
+
+  //   // const newCashFlowItems = Object.entries(payload.cashFlowItems).map(
+  //   //   ([productId, { price, qty }]) =>
+  //   //     cashFlowItemRepo.create({
+  //   //       cashFlow: { id: cashFlow.id },
+  //   //       product: { id: productId },
+  //   //       in: qty,
+  //   //       price,
+  //   //     }),
+  //   // );
+
+  //   return {
+  //     message: 'Successfully added cash flow',
+  //     success: true,
+  //     statusCode: 200,
+  //   };
+  // }
 
   @Transactional('dataSource')
   public async addReportTransaction(

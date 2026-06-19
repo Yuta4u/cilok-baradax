@@ -36,45 +36,61 @@ export class CashFlowController {
     return res;
   }
 
-  @Get('/:id')
-  public async getById(@Param('id') id: string) {
-    const res = await this.cashFlowService.getById(id);
-    return res;
-  }
-
-  @Get('/view/:id')
-  public async getView(@Param('id') id: string) {
-    const res = await this.cashFlowService.getView(id);
+  @Get('/cabang/today/detail/:id')
+  public async getCabangTodayDetail(@Param('id') id: string) {
+    const res = await this.cashFlowService.getCabangTodayDetail(id);
     return res;
   }
 
   @Post()
-  public async add(@Body() payload: AddCashFlowDto) {
+  public async addCashFlow(@Body() payload: AddCashFlowDto) {
     const res = await startTransaction(
       this.cashFlowService,
-      'addTransaction',
+      'addCashFlowTransaction',
       payload,
     );
     return res;
   }
 
-  @Post('report')
-  public async addReport(@Body() payload: AddReportDto) {
-    const res = await startTransaction(
-      this.cashFlowService,
-      'addReportTransaction',
-      payload,
-    );
-    return res;
-  }
+  // @Get('/:id')
+  // public async getById(@Param('id') id: string) {
+  //   const res = await this.cashFlowService.getById(id);
+  //   return res;
+  // }
 
-  @Put('/confirm')
-  public async confirmReport(@Body() payload: ConfirmReportDto) {
-    const res = await startTransaction(
-      this.cashFlowService,
-      'confirmReportTransaction',
-      payload,
-    );
-    return res;
-  }
+  // @Get('/view/:id')
+  // public async getView(@Param('id') id: string) {
+  //   const res = await this.cashFlowService.getView(id);
+  //   return res;
+  // }
+
+  // @Post()
+  // public async add(@Body() payload: AddCashFlowDto) {
+  //   const res = await startTransaction(
+  //     this.cashFlowService,
+  //     'addTransaction',
+  //     payload,
+  //   );
+  //   return res;
+  // }
+
+  // @Post('report')
+  // public async addReport(@Body() payload: AddReportDto) {
+  //   const res = await startTransaction(
+  //     this.cashFlowService,
+  //     'addReportTransaction',
+  //     payload,
+  //   );
+  //   return res;
+  // }
+
+  // @Put('/confirm')
+  // public async confirmReport(@Body() payload: ConfirmReportDto) {
+  //   const res = await startTransaction(
+  //     this.cashFlowService,
+  //     'confirmReportTransaction',
+  //     payload,
+  //   );
+  //   return res;
+  // }
 }

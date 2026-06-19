@@ -13,10 +13,14 @@ import { ProductEntity } from './product.entity';
 import { Transactional } from '../../decorators/database.decorator';
 import { UpdateStock } from './dtos/update-stock.dto';
 import { AddProductDto } from './dtos/add-product.dto';
+import { StockHistoriesService } from '../stock-history/stock-histories.service';
 
 @Injectable()
 export class ProductService {
-  public constructor(private readonly dataSource: DataSource) {}
+  public constructor(
+    private readonly dataSource: DataSource,
+    private readonly stockHistoryService: StockHistoriesService,
+  ) {}
 
   public async getAll(type: 'Semua' | 'Aman' | 'Menipis', q?: string) {
     const productRepo = this.dataSource.getRepository(ProductEntity);
@@ -29,6 +33,7 @@ export class ProductService {
         'p.stock as stock',
         'p.minimalStock as minimalStock',
         'p.uom as uom',
+        'p.price as price',
         'CASE WHEN p.stock >= p.minimalStock THEN true ELSE false END as status',
       ]);
 
@@ -114,8 +119,6 @@ export class ProductService {
     }
 
     if (payload.type === 'dec' && product.stock < payload.quantity) {
-      console.log(product.stock, payload.quantity);
-
       throw new BadRequestException(
         `Stok tidak mencukupi. Stok tersedia: ${product.stock}, dibutuhkan: ${payload.quantity}`,
       );
@@ -132,5 +135,11 @@ export class ProductService {
       })
       .where('id = :id', { id: payload.id })
       .execute();
+
+    await this.stockHistoryService.createTransaction(manager, {
+      productId: payload.id,
+      qty: payload.quantity,
+      note: payload.type === 'dec' ? 'out' : 'in',
+    });
   }
 }

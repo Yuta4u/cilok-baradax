@@ -5,5 +5,6 @@ import { StockHistoriesService } from './stock-histories.service';
 @Module({
   controllers: [StockHistoriesController],
   providers: [StockHistoriesService],
+  exports: [StockHistoriesService],
 })
 export class StockHistoriesModule {}
