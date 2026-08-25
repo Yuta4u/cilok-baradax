@@ -16,4 +16,9 @@ export class UpdateStock {
   @IsString()
   @IsNotEmpty()
   public type!: 'inc' | 'dec';
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  public note!: string;
 }

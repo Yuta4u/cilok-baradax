@@ -19,6 +19,12 @@ export class UserController {
     return res;
   }
 
+  @Get('/cabang')
+  public async getCabang() {
+    const res = await this.userService.getCabang();
+    return res;
+  }
+
   @Put('/change-password')
   public async changePassword(
     @Body() payload: { id: string; password: string },

@@ -21,7 +21,12 @@ export class StockHistoriesService {
   ) {
     const stockHistoryRepo = manager.getRepository(StockHistoryEntity);
 
-    const stockHistory = stockHistoryRepo.create(payload);
+    const stockHistory = stockHistoryRepo.create({
+      ...payload,
+      product: {
+        id: payload.productId,
+      },
+    });
     return stockHistoryRepo.save(stockHistory);
   }
 }

@@ -102,6 +102,7 @@ export class ProductService {
       throw error;
     }
   }
+
   @Transactional('dataSource')
   public async updateStockTransaction(
     manager: EntityManager,
@@ -141,5 +142,10 @@ export class ProductService {
       qty: payload.quantity,
       note: payload.type === 'dec' ? 'out' : 'in',
     });
+
+    return {
+      statusCode: 200,
+      success: true,
+    };
   }
 }

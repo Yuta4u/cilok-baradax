@@ -6,7 +6,7 @@ import { ProductModule } from './domains/product/product.module';
 import { StockHistoriesModule } from './domains/stock-history/stock-histories.module';
 import { AuthModule } from './domains/auth/auth.module';
 import CashFlowModule from './domains/cash-flow/cash-flow.module';
-import CashFlowItemModule from './domains/cash-flow-item/cash-flow-item.module';
+import { CashFlowItemModule } from './domains/cash-flow-item/cash-flow-item.module';
 
 @Module({
   imports: [

@@ -16,6 +16,7 @@ import { ProductService } from '../product/product.service';
 import { ConfirmReportDto } from './dtos/confirmation.dto';
 import { UserEntity } from '../user/user.entity';
 import { ProductEntity } from '../product/product.entity';
+import { SubmitCashFlowDto } from './dtos/submit-cashflow.dto';
 
 @Injectable()
 export class CashFlowService {
@@ -25,65 +26,71 @@ export class CashFlowService {
     private readonly productService: ProductService,
   ) {}
 
-  public async getDashboard() {
+  public async getDashboard(id: string) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
 
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const [totalTransaksi, omsetHariIni] = await Promise.all([
-      cashFlowRepo.count(),
-      cashFlowRepo
-        .createQueryBuilder('cf')
-        .select('COALESCE(SUM(cf.in), 0)', 'totalOmset')
-        .where('cf.createdAt BETWEEN :start AND :end', {
-          start: startOfDay,
-          end: endOfDay,
-        })
-        .getRawOne(),
-    ]);
+    const result = await cashFlowRepo
+      .createQueryBuilder('cf')
+      .leftJoin('cf.user', 'u')
+      .leftJoin('cf.cashFlowItems', 'cfi')
+      .select([
+        'COUNT(DISTINCT cf.id) AS "totalTransaksi"',
+        'COALESCE(SUM(cfi.out * cfi.price), 0) AS "totalOmset"',
+      ])
+      .where('u.id = :id', { id })
+      .andWhere('cf.verified = :verified', { verified: 0 })
+      .getRawOne();
 
     return {
       message: 'Successfully! get dashboard',
       statusCode: 200,
       success: true,
-      data: {
-        totalTransaksi,
-        omsetHariIni: Number(omsetHariIni.totalOmset),
-      },
+      data: result,
     };
   }
 
-  public async getCabangToday() {
+  public async getHistory(sub: string) {
+    const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
+
+    const result = await cashFlowRepo.find({
+      where: {
+        user: {
+          id: sub,
+        },
+      },
+      relations: {
+        cashFlowItems: {
+          product: true,
+        },
+        user: true,
+      },
+    });
+
+    return result;
+  }
+
+  public async getByCabang(sub: string) {
     const userRepo = this.dataSource.getRepository(UserEntity);
-
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
 
     const result = await userRepo
       .createQueryBuilder('u')
-      .leftJoin('u.cashFlows', 'cf', 'cf.createdAt BETWEEN :start AND :end', {
-        start: startOfDay,
-        end: endOfDay,
-      })
+      .leftJoin('u.cashFlows', 'cf')
       .select([
-        'u.id AS id',
+        'cf.createdAt as "createdAt"',
+        'cf.id AS id',
         'u.name AS name',
+        'cf.verified as verified',
         'COUNT(cf.id) AS totalTransaksi',
         'COALESCE(SUM(cf.in), 0) AS totalOmset',
         'MAX(u.deletedAt) AS deletedAt',
       ])
-      .where('u.permission = :permission', {
-        permission: 4,
+      .where('u.id = :id', {
+        id: sub,
       })
-      .groupBy('u.id')
+      .groupBy('cf.id')
+      .addGroupBy('cf.verified')
       .addGroupBy('u.name')
+      .addGroupBy('cf.createdAt')
       .getRawMany();
 
     return {
@@ -94,9 +101,8 @@ export class CashFlowService {
     };
   }
 
-  public async getCabangTodayDetail(id: string) {
+  public async getCabangToday() {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
-    const cashFlowItemRepo = this.dataSource.getRepository(CashFlowItemEntity);
 
     const startDate = new Date();
     startDate.setHours(0, 0, 0, 0);
@@ -104,40 +110,22 @@ export class CashFlowService {
     const endDate = new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    const cashFlow = await cashFlowRepo
-      .createQueryBuilder('c')
-      .leftJoin('c.user', 'u')
-      .select(['c.id AS id'])
-      .where('c.created_at >= :startDate', { startDate })
-      .andWhere('c.created_at <= :endDate', { endDate })
-      .andWhere('u.id = :id', { id })
-      .getRawOne();
+    const result = await cashFlowRepo.find({
+      where: {
+        createdAt: Between(startDate, endDate),
+      },
+      relations: {
+        cashFlowItems: {
+          product: true,
+        },
+        user: true,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
 
-    if (!cashFlow) {
-      return {
-        message: 'Successfully! get cabang today',
-        statusCode: 200,
-        success: true,
-        data: [],
-      };
-    }
-
-    const cashFlowItem = await cashFlowItemRepo
-      .createQueryBuilder('cfi')
-      .leftJoin('cfi.cashFlow', 'cf')
-      .leftJoin('cfi.product', 'p')
-      .select(['cfi.id AS id', 'cfi.in AS in', 'p.name AS name'])
-      .where('cf.id = :cashFlowId', { cashFlowId: cashFlow.id })
-      .getRawMany();
-
-    console.log(cashFlowItem, 'test');
-
-    return {
-      message: 'Successfully! get cabang today',
-      statusCode: 200,
-      success: true,
-      data: cashFlowItem,
-    };
+    return result;
   }
 
   public async getAll(query: BaseParams, sub: string) {
@@ -214,7 +202,6 @@ export class CashFlowService {
     ]);
 
     const totalPages = Math.ceil(totalItems / limit);
-    console.log(todayIn, 'test');
 
     return {
       message: 'Successfully! get cash flow',
@@ -370,6 +357,7 @@ export class CashFlowService {
         id: p.id,
         type: 'dec',
         quantity: qty,
+        note: 'Cash flow',
       });
     }
 
@@ -579,6 +567,37 @@ export class CashFlowService {
       message: 'Successfully confirmed cash flow report',
       success: true,
       statusCode: 200,
+    };
+  }
+
+  @Transactional('dataSource')
+  public async submitCashFlowTransaction(
+    manager: EntityManager,
+    payload: SubmitCashFlowDto,
+  ) {
+    const cashFlowRepo = manager.getRepository(CashFlowEntity);
+    const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
+
+    for (const [id, { qty }] of Object.entries(payload.cashFlowItems)) {
+      const cashFlowItem = await cashFlowItemRepo.findOne({ where: { id } });
+
+      if (!cashFlowItem) {
+        throw new NotFoundException('Cash flow item not found');
+      }
+
+      if (qty > cashFlowItem.in) {
+        throw new BadRequestException('Quantity tidak boleh lebih dari stock!');
+      }
+
+      await cashFlowItemRepo.update({ id }, { out: qty });
+    }
+
+    await cashFlowRepo.update({ id: payload.id }, { verified: 1 });
+
+    return {
+      message: 'Successfully confirmed cash flow report',
+      statusCode: 200,
+      success: true,
     };
   }
 }

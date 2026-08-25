@@ -11,6 +11,18 @@ import { PERMISSION } from '../../constant';
 export class UserService {
   public constructor(private readonly dataSource: DataSource) {}
 
+  public async getCabang() {
+    const userRepo = this.dataSource.getRepository(UserEntity);
+
+    const result = await userRepo.find({
+      where: {
+        permission: 4,
+      },
+    });
+
+    return result;
+  }
+
   // $$
   @Transactional('dataSource')
   public async createTransaction(
