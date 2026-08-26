@@ -600,4 +600,60 @@ export class CashFlowService {
       success: true,
     };
   }
+
+  @Transactional('dataSource')
+  public async approvalCashFlowTransaction(
+    manager: EntityManager,
+    payload: SubmitCashFlowDto,
+  ) {
+    const cashFlowRepo = manager.getRepository(CashFlowEntity);
+    const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
+
+    for (const [id, { qty }] of Object.entries(payload.cashFlowItems)) {
+      const cashFlowItem = await cashFlowItemRepo.findOne({
+        where: { id },
+        relations: {
+          product: true,
+        },
+      });
+
+      if (!cashFlowItem) {
+        throw new NotFoundException('Cash flow item not found');
+      }
+
+      if (qty > cashFlowItem.in) {
+        throw new BadRequestException('Quantity tidak boleh lebih dari stock!');
+      }
+
+      await cashFlowItemRepo.update(
+        { id },
+        { out: qty, totalPrice: qty * cashFlowItem.price },
+      );
+
+      const gap = cashFlowItem.out! - qty;
+      if (gap > 0) {
+        await this.productService.updateStockTransaction(manager, {
+          id: cashFlowItem.product.id,
+          type: 'inc',
+          quantity: gap,
+          note: 'approval cash flow item',
+        });
+      } else {
+        await this.productService.updateStockTransaction(manager, {
+          id: cashFlowItem.product.id,
+          type: 'dec',
+          quantity: Math.abs(gap),
+          note: 'approval cash flow item',
+        });
+      }
+    }
+
+    await cashFlowRepo.update({ id: payload.id }, { verified: 0 });
+
+    return {
+      message: 'Successfully confirmed cash flow report',
+      statusCode: 200,
+      success: true,
+    };
+  }
 }

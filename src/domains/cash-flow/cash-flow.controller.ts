@@ -60,4 +60,14 @@ export class CashFlowController {
     );
     return res;
   }
+
+  @Put('/approval')
+  public async approvalCashFlow(@Body() payload: SubmitCashFlowDto) {
+    const res = await startTransaction(
+      this.cashFlowService,
+      'approvalCashFlowTransaction',
+      payload,
+    );
+    return res;
+  }
 }
