@@ -630,20 +630,14 @@ export class CashFlowService {
         { out: qty, totalPrice: qty * cashFlowItem.price },
       );
 
-      const gap = cashFlowItem.out! - qty;
-      if (gap > 0) {
+      const remainingStock = cashFlowItem.in - qty;
+
+      if (remainingStock) {
         await this.productService.updateStockTransaction(manager, {
           id: cashFlowItem.product.id,
           type: 'inc',
-          quantity: gap,
-          note: 'approval cash flow item',
-        });
-      } else {
-        await this.productService.updateStockTransaction(manager, {
-          id: cashFlowItem.product.id,
-          type: 'dec',
-          quantity: Math.abs(gap),
-          note: 'approval cash flow item',
+          quantity: remainingStock,
+          note: 'in, stock sisa',
         });
       }
     }

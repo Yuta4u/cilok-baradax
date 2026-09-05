@@ -140,7 +140,8 @@ export class ProductService {
     await this.stockHistoryService.createTransaction(manager, {
       productId: payload.id,
       qty: payload.quantity,
-      note: payload.type === 'dec' ? 'out' : 'in',
+      type: payload.type === 'dec' ? 'out' : 'in',
+      note: payload.note,
     });
 
     return {

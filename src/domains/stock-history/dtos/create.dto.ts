@@ -8,6 +8,11 @@ export class CreateStockHistoryDto {
   public productId!: string;
 
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  public type!: 'in' | 'out';
+
+  @ApiProperty()
   @IsNumber()
   @IsNotEmpty()
   public qty!: number;

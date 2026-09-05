@@ -9,6 +9,9 @@ export class StockHistoryEntity extends BaseEntity {
   @Column({ name: 'qty', type: 'int' })
   public qty!: number;
 
+  @Column({ name: 'type', type: 'enum', enum: ['in', 'out'] })
+  public type!: 'in' | 'out';
+
   @Column({ name: 'note', type: 'text' })
   public note!: string;
 
