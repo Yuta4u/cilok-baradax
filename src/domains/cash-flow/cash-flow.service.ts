@@ -58,6 +58,9 @@ export class CashFlowService {
           id: sub,
         },
       },
+      order: {
+        createdAt: 'DESC',
+      },
       relations: {
         cashFlowItems: {
           product: true,
@@ -121,7 +124,7 @@ export class CashFlowService {
         user: true,
       },
       order: {
-        createdAt: 'DESC',
+        createdAt: 'ASC',
       },
     });
 
@@ -589,10 +592,19 @@ export class CashFlowService {
         throw new BadRequestException('Quantity tidak boleh lebih dari stock!');
       }
 
-      await cashFlowItemRepo.update({ id }, { out: qty });
+      const remains = cashFlowItem.in - qty;
+
+      await cashFlowItemRepo.update({ id }, { out: remains });
     }
 
-    await cashFlowRepo.update({ id: payload.id }, { verified: 1 });
+    await cashFlowRepo.update(
+      { id: payload.id },
+      {
+        verified: 1,
+        overhead: payload.pengeluaranTambahan,
+        note: payload.note,
+      },
+    );
 
     return {
       message: 'Successfully confirmed cash flow report',
@@ -625,10 +637,10 @@ export class CashFlowService {
         throw new BadRequestException('Quantity tidak boleh lebih dari stock!');
       }
 
-      await cashFlowItemRepo.update(
-        { id },
-        { out: qty, totalPrice: qty * cashFlowItem.price },
-      );
+      const out = cashFlowItem.in - qty;
+      const totalPrice = out * cashFlowItem.price;
+
+      await cashFlowItemRepo.update({ id }, { out, totalPrice });
 
       const remainingStock = cashFlowItem.in - qty;
 
@@ -636,13 +648,20 @@ export class CashFlowService {
         await this.productService.updateStockTransaction(manager, {
           id: cashFlowItem.product.id,
           type: 'inc',
-          quantity: remainingStock,
+          quantity: qty,
           note: 'in, stock sisa',
         });
       }
     }
 
-    await cashFlowRepo.update({ id: payload.id }, { verified: 0 });
+    await cashFlowRepo.update(
+      { id: payload.id },
+      {
+        verified: 0,
+        overhead: payload.pengeluaranTambahan,
+        note: payload.note,
+      },
+    );
 
     return {
       message: 'Successfully confirmed cash flow report',

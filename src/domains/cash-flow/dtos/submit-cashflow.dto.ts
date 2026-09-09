@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsObject, IsUUID } from 'class-validator';
+import { IsNumber, IsObject, IsString, IsUUID } from 'class-validator';
 
 export class SubmitCashFlowDto {
   @ApiProperty()
@@ -20,4 +20,12 @@ export class SubmitCashFlowDto {
   })
   @IsObject()
   cashFlowItems!: Record<string, { qty: number }>;
+
+  @ApiProperty()
+  @IsNumber()
+  pengeluaranTambahan!: number;
+
+  @ApiProperty()
+  @IsString()
+  note!: string;
 }

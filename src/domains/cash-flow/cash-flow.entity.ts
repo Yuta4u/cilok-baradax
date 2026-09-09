@@ -28,6 +28,13 @@ export class CashFlowEntity extends BaseEntity {
   public note?: string;
 
   @Column({
+    name: 'overhead',
+    type: 'int',
+    default: 0,
+  })
+  public overhead!: number;
+
+  @Column({
     name: 'verified',
     type: 'int',
     default: 0,
