@@ -46,8 +46,8 @@ async function bootstrap() {
   await app.listen(4001, '0.0.0.0');
 
   // ── Auto Seeder ─────────────────────────────
-  // const dataSource = app.get(DataSource);
-  // await userSeed(dataSource);
+  const dataSource = app.get(DataSource);
+  await userSeed(dataSource);
 }
 
 void bootstrap();
