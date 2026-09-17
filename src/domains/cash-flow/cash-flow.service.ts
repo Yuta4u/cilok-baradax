@@ -49,6 +49,26 @@ export class CashFlowService {
     };
   }
 
+  public async getDetailById(id: string) {
+    const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
+
+    const result = await cashFlowRepo.findOne({
+      where: {
+        id,
+      },
+      relations: {
+        cashFlowItems: {
+          product: true,
+        },
+        user: true,
+      },
+    });
+
+    console.log('hit cuy');
+
+    return result;
+  }
+
   public async getHistory(sub: string) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
 
