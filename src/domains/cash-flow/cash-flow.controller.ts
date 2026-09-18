@@ -41,6 +41,15 @@ export class CashFlowController {
     return res;
   }
 
+  @Get('/history/excel')
+  public async getHistoryExcel(
+    @UserReq() { sub }: IUserReq,
+    @Query() query: BaseParams,
+  ) {
+    const res = await this.cashFlowService.getHistoryExcel(sub, query);
+    return res;
+  }
+
   @Get('/detail/:id')
   public async getDetailById(@Param('id') id: string) {
     const res = await this.cashFlowService.getDetailById(id);
