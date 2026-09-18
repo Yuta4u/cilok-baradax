@@ -24,14 +24,20 @@ export class CashFlowController {
   }
 
   @Get('/dashboard')
-  public async getDashboard(@UserReq() { sub }: IUserReq) {
-    const res = await this.cashFlowService.getDashboard(sub);
+  public async getDashboard(
+    @UserReq() { sub }: IUserReq,
+    @Query() query: BaseParams,
+  ) {
+    const res = await this.cashFlowService.getDashboard(sub, query);
     return res;
   }
 
   @Get('/history')
-  public async getHistory(@UserReq() { sub }: IUserReq) {
-    const res = await this.cashFlowService.getHistory(sub);
+  public async getHistory(
+    @UserReq() { sub }: IUserReq,
+    @Query() query: BaseParams,
+  ) {
+    const res = await this.cashFlowService.getHistory(sub, query);
     return res;
   }
 

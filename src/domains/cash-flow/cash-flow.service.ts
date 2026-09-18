@@ -26,20 +26,29 @@ export class CashFlowService {
     private readonly productService: ProductService,
   ) {}
 
-  public async getDashboard(id: string) {
+  public async getDashboard(id: string, query: BaseParams) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
 
-    const result = await cashFlowRepo
+    const qb = cashFlowRepo
       .createQueryBuilder('cf')
       .leftJoin('cf.user', 'u')
       .leftJoin('cf.cashFlowItems', 'cfi')
       .select([
         'COUNT(DISTINCT cf.id) AS "totalTransaksi"',
+        'SUM(DISTINCT cf.overhead) AS "totalPengeluaran"',
         'COALESCE(SUM(cfi.out * cfi.price), 0) AS "totalOmset"',
       ])
       .where('u.id = :id', { id })
-      .andWhere('cf.verified = :verified', { verified: 0 })
-      .getRawOne();
+      .andWhere('cf.verified = :verified', { verified: 0 });
+
+    if (query.sd && query.ed) {
+      qb.andWhere('cf.createdAt BETWEEN :startDate AND :endDate', {
+        startDate: `${query.sd} 00:00:00`,
+        endDate: `${query.ed} 23:59:59.999`,
+      });
+    }
+
+    const result = await qb.getRawOne();
 
     return {
       message: 'Successfully! get dashboard',
@@ -64,20 +73,27 @@ export class CashFlowService {
       },
     });
 
-    console.log('hit cuy');
-
     return result;
   }
 
-  public async getHistory(sub: string) {
+  public async getHistory(sub: string, query: BaseParams) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
 
-    const result = await cashFlowRepo.find({
-      where: {
-        user: {
-          id: sub,
-        },
+    const where: any = {
+      user: {
+        id: sub,
       },
+    };
+
+    if (query.sd && query.ed) {
+      const startDate = new Date(`${query.sd}T00:00:00`);
+      const endDate = new Date(`${query.ed}T23:59:59.999`);
+
+      where.createdAt = Between(startDate, endDate);
+    }
+
+    const result = await cashFlowRepo.find({
+      where,
       order: {
         createdAt: 'DESC',
       },
