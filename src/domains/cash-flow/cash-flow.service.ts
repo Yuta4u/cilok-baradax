@@ -1,3 +1,4 @@
+import type ExcelJs from 'exceljs';
 import {
   BadRequestException,
   Injectable,
@@ -17,6 +18,8 @@ import { ConfirmReportDto } from './dtos/confirmation.dto';
 import { UserEntity } from '../user/user.entity';
 import { ProductEntity } from '../product/product.entity';
 import { SubmitCashFlowDto } from './dtos/submit-cashflow.dto';
+import { ExcelService } from '../excel/excel.service';
+import { format } from 'date-fns';
 
 @Injectable()
 export class CashFlowService {
@@ -24,22 +27,32 @@ export class CashFlowService {
     private readonly dataSource: DataSource,
     private readonly userService: UserService,
     private readonly productService: ProductService,
+    private readonly excelService: ExcelService,
   ) {}
 
-  public async getDashboard(id: string) {
+  public async getDashboard(id: string, query: BaseParams) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
 
-    const result = await cashFlowRepo
+    const qb = cashFlowRepo
       .createQueryBuilder('cf')
       .leftJoin('cf.user', 'u')
       .leftJoin('cf.cashFlowItems', 'cfi')
       .select([
         'COUNT(DISTINCT cf.id) AS "totalTransaksi"',
+        'SUM(DISTINCT cf.overhead) AS "totalPengeluaran"',
         'COALESCE(SUM(cfi.out * cfi.price), 0) AS "totalOmset"',
       ])
       .where('u.id = :id', { id })
-      .andWhere('cf.verified = :verified', { verified: 0 })
-      .getRawOne();
+      .andWhere('cf.verified = :verified', { verified: 0 });
+
+    if (query.sd && query.ed) {
+      qb.andWhere('cf.createdAt BETWEEN :startDate AND :endDate', {
+        startDate: `${query.sd} 00:00:00`,
+        endDate: `${query.ed} 23:59:59.999`,
+      });
+    }
+
+    const result = await qb.getRawOne();
 
     return {
       message: 'Successfully! get dashboard',
@@ -49,15 +62,42 @@ export class CashFlowService {
     };
   }
 
-  public async getHistory(sub: string) {
+  public async getDetailById(id: string) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
 
-    const result = await cashFlowRepo.find({
+    const result = await cashFlowRepo.findOne({
       where: {
-        user: {
-          id: sub,
-        },
+        id,
       },
+      relations: {
+        cashFlowItems: {
+          product: true,
+        },
+        user: true,
+      },
+    });
+
+    return result;
+  }
+
+  public async getHistory(sub: string, query: BaseParams) {
+    const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
+
+    const where: any = {
+      user: {
+        id: sub,
+      },
+    };
+
+    if (query.sd && query.ed) {
+      const startDate = new Date(`${query.sd}T00:00:00`);
+      const endDate = new Date(`${query.ed}T23:59:59.999`);
+
+      where.createdAt = Between(startDate, endDate);
+    }
+
+    const result = await cashFlowRepo.find({
+      where,
       order: {
         createdAt: 'DESC',
       },
@@ -70,6 +110,123 @@ export class CashFlowService {
     });
 
     return result;
+  }
+
+  public async getHistoryExcel(sub: string, query: BaseParams) {
+    const cashFlowItemRepo = this.dataSource.getRepository(CashFlowItemEntity);
+    const userRepo = this.dataSource.getRepository(UserEntity);
+
+    const user = await userRepo.findOne({
+      where: {
+        id: sub,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const startDate = query.sd
+      ? new Date(`${query.sd}T00:00:00`)
+      : new Date('2025-01-09T00:00:00');
+
+    const endDate = query.ed
+      ? new Date(`${query.ed}T23:59:59.999`)
+      : new Date();
+
+    const data = await cashFlowItemRepo.find({
+      order: {
+        createdAt: 'DESC',
+      },
+      relations: {
+        product: true,
+        cashFlow: {
+          user: true,
+        },
+      },
+      where: {
+        cashFlow: {
+          user: {
+            id: sub,
+          },
+          createdAt: Between(startDate, endDate),
+        },
+      },
+    });
+
+    if (data.length === 0) {
+      throw new BadRequestException('Data not found');
+    }
+
+    const header = ['PRODUCT NAME', 'IN', 'OUT', 'PRICE', 'TOTAL PRICE'];
+
+    const columns = [
+      {
+        header: 'PRODUCT NAME',
+        key: 'product',
+      },
+      {
+        header: 'IN',
+        key: 'in',
+        style: {
+          alignment: {
+            horizontal: 'center',
+          },
+        },
+      },
+      {
+        header: 'OUT',
+        key: 'out',
+        style: {
+          alignment: {
+            horizontal: 'center',
+          },
+        },
+      },
+      {
+        header: 'PRICE',
+        key: 'price',
+        style: {
+          alignment: {
+            horizontal: 'center',
+          },
+        },
+      },
+      {
+        header: 'TOTAL PRICE',
+        key: 'totalPrice',
+        style: {
+          alignment: {
+            horizontal: 'center',
+          },
+        },
+      },
+    ];
+
+    function rowContent(val: CashFlowItemEntity) {
+      return {
+        product: val.product?.name ?? '',
+        in: val.in ?? 0,
+        out: val.out ?? 0,
+        price: val.price ?? 0,
+        totalPrice: val.totalPrice ?? 0,
+      };
+    }
+
+    const buffer = await this.excelService.generateDataExcel(
+      data,
+      `History Report - ${user.name}`,
+      columns as Partial<ExcelJs.Column>[],
+      {
+        sd: query.sd ?? format(startDate, 'yyyy-MM-dd'),
+        ed: query.ed ?? format(endDate, 'yyyy-MM-dd'),
+      },
+      header,
+      `History Report - ${user.name}`,
+      rowContent,
+    );
+
+    return buffer;
   }
 
   public async getByCabang(sub: string) {

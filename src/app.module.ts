@@ -7,6 +7,7 @@ import { StockHistoriesModule } from './domains/stock-history/stock-histories.mo
 import { AuthModule } from './domains/auth/auth.module';
 import CashFlowModule from './domains/cash-flow/cash-flow.module';
 import { CashFlowItemModule } from './domains/cash-flow-item/cash-flow-item.module';
+import { ExcelModule } from './domains/excel/excel.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CashFlowItemModule } from './domains/cash-flow-item/cash-flow-item.modu
     StockHistoriesModule,
     CashFlowModule,
     CashFlowItemModule,
+    ExcelModule,
   ],
 })
 export class AppModule {}
