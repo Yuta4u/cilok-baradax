@@ -14,6 +14,7 @@ import { Transactional } from '../../decorators/database.decorator';
 import { UpdateStock } from './dtos/update-stock.dto';
 import { AddProductDto } from './dtos/add-product.dto';
 import { StockHistoriesService } from '../stock-history/stock-histories.service';
+import { EditStock } from './dtos/edit-stock.dto';
 
 @Injectable()
 export class ProductService {
@@ -147,6 +148,52 @@ export class ProductService {
     return {
       statusCode: 200,
       success: true,
+    };
+  }
+
+  @Transactional('dataSource')
+  public async editStockTransaction(
+    manager: EntityManager,
+    payload: EditStock,
+  ) {
+    const productRepo = manager.getRepository(ProductEntity);
+
+    const product = await productRepo.findOne({
+      where: { id: payload.id },
+      select: ['id', 'stock'],
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produk tidak ditemukan');
+    }
+
+    const previousStock = Number(product.stock);
+    const diff = payload.newStock - previousStock;
+
+    if (diff === 0) {
+      throw new BadRequestException(
+        `Stok baru sama dengan stok saat ini (${previousStock}).`,
+      );
+    }
+
+    await productRepo.update({ id: payload.id }, { stock: payload.newStock });
+
+    await this.stockHistoryService.createTransaction(manager, {
+      productId: payload.id,
+      qty: Math.abs(diff),
+      type: diff > 0 ? 'in' : 'out',
+      note: payload.note?.trim() || 'Koreksi stok',
+    });
+
+    return {
+      statusCode: 200,
+      success: true,
+      data: {
+        id: payload.id,
+        previousStock,
+        stock: payload.newStock,
+      },
     };
   }
 }

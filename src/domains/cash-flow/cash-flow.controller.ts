@@ -24,11 +24,8 @@ export class CashFlowController {
   }
 
   @Get('/dashboard')
-  public async getDashboard(
-    @UserReq() { sub }: IUserReq,
-    @Query() query: BaseParams,
-  ) {
-    const res = await this.cashFlowService.getDashboard(sub, query);
+  public async getDashboard(@Query() query: BaseParams) {
+    const res = await this.cashFlowService.getDashboard(query);
     return res;
   }
 

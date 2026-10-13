@@ -4,6 +4,7 @@ import { ProductService } from './product.service';
 import { UpdateStock } from './dtos/update-stock.dto';
 import { startTransaction } from '../../decorators/database.decorator';
 import { AddProductDto } from './dtos/add-product.dto';
+import { EditStock } from './dtos/edit-stock.dto';
 
 @ApiBearerAuth('Authorization')
 @Controller({
@@ -36,6 +37,16 @@ export class ProductController {
     const res = await startTransaction(
       this.productService,
       'updateStockTransaction',
+      payload,
+    );
+    return res;
+  }
+
+  @Put('/edit-stock')
+  public async editStock(@Body() payload: EditStock) {
+    const res = await startTransaction(
+      this.productService,
+      'editStockTransaction',
       payload,
     );
     return res;

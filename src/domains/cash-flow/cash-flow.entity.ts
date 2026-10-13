@@ -35,6 +35,13 @@ export class CashFlowEntity extends BaseEntity {
   public overhead!: number;
 
   @Column({
+    name: 'stock_overhead',
+    type: 'int',
+    default: 0,
+  })
+  public stockOverhead!: number;
+
+  @Column({
     name: 'verified',
     type: 'int',
     default: 0,

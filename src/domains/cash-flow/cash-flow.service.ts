@@ -30,7 +30,7 @@ export class CashFlowService {
     private readonly excelService: ExcelService,
   ) {}
 
-  public async getDashboard(id: string, query: BaseParams) {
+  public async getDashboard(query: BaseParams) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
 
     const qb = cashFlowRepo
@@ -39,11 +39,10 @@ export class CashFlowService {
       .leftJoin('cf.cashFlowItems', 'cfi')
       .select([
         'COUNT(DISTINCT cf.id) AS "totalTransaksi"',
-        'SUM(DISTINCT cf.overhead) AS "totalPengeluaran"',
-        'COALESCE(SUM(cfi.out * cfi.price), 0) AS "totalOmset"',
+        'SUM(DISTINCT cf.overhead + cf.stock_overhead) AS "totalPengeluaran"',
+        'COALESCE(SUM(cfi.in * cfi.price), 0) AS "total"',
       ])
-      .where('u.id = :id', { id })
-      .andWhere('cf.verified = :verified', { verified: 0 });
+      .where('cf.verified = :verified', { verified: 0 });
 
     if (query.sd && query.ed) {
       qb.andWhere('cf.createdAt BETWEEN :startDate AND :endDate', {
@@ -53,6 +52,7 @@ export class CashFlowService {
     }
 
     const result = await qb.getRawOne();
+    console.log(result, 'test');
 
     return {
       message: 'Successfully! get dashboard',
@@ -461,7 +461,6 @@ export class CashFlowService {
   ) {
     const cashFlowRepo = manager.getRepository(CashFlowEntity);
     const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
-    const productRepo = manager.getRepository(ProductEntity);
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -482,6 +481,8 @@ export class CashFlowService {
       throw new BadRequestException('Cash flow already exists today');
     }
 
+    console.log(payload, 'hit cuy');
+
     const cashFlow = cashFlowRepo.create({
       user: {
         id: payload.id,
@@ -493,17 +494,15 @@ export class CashFlowService {
 
     await manager.save(cashFlow);
 
-    const product = await productRepo.find();
-
     const cashFlowItemObj = [];
 
-    for (const p of product) {
-      const { qty, price } = payload.cashFlowItems[p.id] as never;
-
+    for (const [productId, { qty, price }] of Object.entries(
+      payload.cashFlowItems,
+    )) {
       cashFlowItemObj.push(
         cashFlowItemRepo.create({
           product: {
-            id: p.id,
+            id: productId,
           },
           in: qty ? Number(qty) : 0,
           price: price ? price : 0,
@@ -514,7 +513,7 @@ export class CashFlowService {
       );
 
       await this.productService.updateStockTransaction(manager, {
-        id: p.id,
+        id: productId,
         type: 'dec',
         quantity: qty,
         note: 'Cash flow',
@@ -778,6 +777,8 @@ export class CashFlowService {
     const cashFlowRepo = manager.getRepository(CashFlowEntity);
     const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
 
+    let stockOverhead = 0;
+
     for (const [id, { qty }] of Object.entries(payload.cashFlowItems)) {
       const cashFlowItem = await cashFlowItemRepo.findOne({
         where: { id },
@@ -809,6 +810,9 @@ export class CashFlowService {
           note: 'in, stock sisa',
         });
       }
+      if (qty) {
+        stockOverhead = stockOverhead + qty * cashFlowItem.price;
+      }
     }
 
     await cashFlowRepo.update(
@@ -816,6 +820,7 @@ export class CashFlowService {
       {
         verified: 0,
         overhead: payload.pengeluaranTambahan,
+        stockOverhead,
         note: payload.note,
       },
     );

@@ -9,5 +9,5 @@ export class AddCashFlowDto {
 
   @ApiProperty()
   @IsNotEmpty()
-  public cashFlowItems!: Record<string, string>;
+  public cashFlowItems!: Record<string, { qty: number; price: number }>;
 }
