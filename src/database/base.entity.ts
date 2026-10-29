@@ -31,6 +31,10 @@ export abstract class BaseEntity {
 }
 
 export class BaseParams {
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
   @IsString()
   @IsOptional()
   page?: string;

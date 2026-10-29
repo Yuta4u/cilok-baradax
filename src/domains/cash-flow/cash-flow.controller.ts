@@ -47,6 +47,12 @@ export class CashFlowController {
     return res;
   }
 
+  @Get('/report')
+  public async getReport(@Query() query: BaseParams) {
+    const res = await this.cashFlowService.getReport(query);
+    return res;
+  }
+
   @Get('/detail/:id')
   public async getDetailById(@Param('id') id: string) {
     const res = await this.cashFlowService.getDetailById(id);

@@ -20,6 +20,7 @@ import { ProductEntity } from '../product/product.entity';
 import { SubmitCashFlowDto } from './dtos/submit-cashflow.dto';
 import { ExcelService } from '../excel/excel.service';
 import { format } from 'date-fns';
+import { CashFlowOverheadEntity } from '../cash-flow-overhead/cash-flow-overhead.entity';
 
 @Injectable()
 export class CashFlowService {
@@ -52,7 +53,6 @@ export class CashFlowService {
     }
 
     const result = await qb.getRawOne();
-    console.log(result, 'test');
 
     return {
       message: 'Successfully! get dashboard',
@@ -70,6 +70,7 @@ export class CashFlowService {
         id,
       },
       relations: {
+        cashFlowOverheads: true,
         cashFlowItems: {
           product: true,
         },
@@ -102,6 +103,7 @@ export class CashFlowService {
         createdAt: 'DESC',
       },
       relations: {
+        cashFlowOverheads: true,
         cashFlowItems: {
           product: true,
         },
@@ -252,6 +254,7 @@ export class CashFlowService {
       .addGroupBy('u.name')
       .addGroupBy('cf.createdAt')
       .getRawMany();
+    console.log(result, 'hitx');
 
     return {
       message: 'Successfully! get cabang today',
@@ -275,6 +278,7 @@ export class CashFlowService {
         createdAt: Between(startDate, endDate),
       },
       relations: {
+        cashFlowOverheads: true,
         cashFlowItems: {
           product: true,
         },
@@ -428,6 +432,115 @@ export class CashFlowService {
       statusCode: 200,
       success: true,
       data,
+    };
+  }
+
+  public async getReport(query: BaseParams) {
+    const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
+
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Number(query.limit) || 10);
+
+    const qb = cashFlowRepo.createQueryBuilder('cf').leftJoin('cf.user', 'u');
+
+    if (query.userId && query.userId !== 'all') {
+      qb.andWhere('u.id = :userId', {
+        userId: query.userId,
+      });
+    }
+
+    if (query.sd) {
+      qb.andWhere('cf.createdAt >= :sd', {
+        sd: query.sd,
+      });
+    }
+
+    if (query.ed) {
+      qb.andWhere("cf.createdAt < CAST(:ed AS date) + INTERVAL '1 day'", {
+        ed: query.ed,
+      });
+    }
+
+    if (query.type === 'INCOME') {
+      qb.andWhere('COALESCE(cf.in, 0) > 0');
+    } else if (query.type === 'EXPENSE') {
+      qb.andWhere('COALESCE(cf.out, 0) > 0');
+    }
+
+    const dataQuery = qb
+      .clone()
+      .select([
+        'cf.id AS id',
+        'cf.in AS cash',
+        'cf.createdAt AS "createdAt"',
+        'cf.out AS out',
+        'cf.qris AS qris',
+        'cf.shopeeFood AS "shopeeFood"',
+        'cf.goFood AS "goFood"',
+        'cf.grabFood AS "grabFood"',
+        'u.id AS "userId"',
+        'u.name AS "userName"',
+        'cf.verified AS verified',
+        `(
+        COALESCE(cf.in, 0) +
+        COALESCE(cf.qris, 0) +
+        COALESCE(cf.shopeeFood, 0) +
+        COALESCE(cf.goFood, 0) +
+        COALESCE(cf.grabFood, 0)
+      ) AS "totalSales"`,
+      ])
+      .orderBy('cf.createdAt', 'DESC')
+      .addOrderBy('cf.id', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit);
+
+    // Summary seluruh data terfilter, bukan hanya halaman aktif
+    const summaryQuery = qb
+      .clone()
+      .select([
+        `COALESCE(SUM(cf.in), 0) AS "totalCash"`,
+        `COALESCE(SUM(cf.out), 0) AS "totalOut"`,
+        `COALESCE(SUM(cf.qris), 0) AS "totalQris"`,
+        `COALESCE(
+        SUM(
+          COALESCE(cf.shopeeFood, 0) +
+          COALESCE(cf.goFood, 0) +
+          COALESCE(cf.grabFood, 0)
+        ), 0
+      ) AS "totalOnline"`,
+        `COALESCE(
+        SUM(
+          COALESCE(cf.in, 0) +
+          COALESCE(cf.qris, 0) +
+          COALESCE(cf.shopeeFood, 0) +
+          COALESCE(cf.goFood, 0) +
+          COALESCE(cf.grabFood, 0)
+        ), 0
+      ) AS "totalSales"`,
+      ])
+      .where('cf.verified = :verified', { verified: 0 });
+
+    const [data, totalItems, summary] = await Promise.all([
+      dataQuery.getRawMany(),
+      qb.clone().getCount(),
+      summaryQuery.getRawOne(),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total: totalItems,
+        page,
+        limit,
+        totalPages: Math.ceil(totalItems / limit),
+        summary: {
+          totalSales: Number(summary.totalSales),
+          totalCash: Number(summary.totalCash),
+          totalQris: Number(summary.totalQris),
+          totalOnline: Number(summary.totalOnline),
+          totalOut: Number(summary.totalOut),
+        },
+      },
     };
   }
 
@@ -722,6 +835,10 @@ export class CashFlowService {
       },
     );
 
+    console.log(payload, 'test');
+
+    throw new BadRequestException('cxcx');
+
     return {
       message: 'Successfully confirmed cash flow report',
       success: true,
@@ -735,6 +852,7 @@ export class CashFlowService {
     payload: SubmitCashFlowDto,
   ) {
     const cashFlowRepo = manager.getRepository(CashFlowEntity);
+    const cashFlowOverheadRepo = manager.getRepository(CashFlowOverheadEntity);
     const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
 
     for (const [id, { qty }] of Object.entries(payload.cashFlowItems)) {
@@ -759,8 +877,24 @@ export class CashFlowService {
         verified: 1,
         overhead: payload.pengeluaranTambahan,
         note: payload.note,
+        qris: payload.qris,
+        goFood: payload.gofood,
+        grabFood: payload.grabfood,
+        shopeeFood: payload.shopeefood,
       },
     );
+
+    if (payload.expenses.length) {
+      const newExpenses = payload.expenses.map((e) => {
+        return {
+          note: e.note,
+          amount: e.amount,
+          cashFlow: { id: payload.id },
+        };
+      });
+
+      await cashFlowOverheadRepo.save(newExpenses);
+    }
 
     return {
       message: 'Successfully confirmed cash flow report',
@@ -776,6 +910,7 @@ export class CashFlowService {
   ) {
     const cashFlowRepo = manager.getRepository(CashFlowEntity);
     const cashFlowItemRepo = manager.getRepository(CashFlowItemEntity);
+    const cashFlowOverheadRepo = manager.getRepository(CashFlowOverheadEntity);
 
     let stockOverhead = 0;
 
@@ -823,6 +958,11 @@ export class CashFlowService {
         stockOverhead,
         note: payload.note,
       },
+    );
+
+    await cashFlowOverheadRepo.delete({ cashFlow: { id: payload.id } });
+    await cashFlowOverheadRepo.save(
+      payload.expenses.map((e) => ({ ...e, cashFlow: { id: payload.id } })),
     );
 
     return {

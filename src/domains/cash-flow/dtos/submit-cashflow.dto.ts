@@ -1,5 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsObject, IsString, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsNumber,
+  IsObject,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+
+class Expenses {
+  @ApiProperty()
+  @IsString()
+  note!: string;
+
+  @ApiProperty()
+  @IsNumber()
+  amount!: number;
+}
 
 export class SubmitCashFlowDto {
   @ApiProperty()
@@ -26,6 +44,30 @@ export class SubmitCashFlowDto {
   pengeluaranTambahan!: number;
 
   @ApiProperty()
+  @IsNumber()
+  qris!: number;
+
+  @ApiProperty()
+  @IsNumber()
+  gofood!: number;
+
+  @ApiProperty()
+  @IsNumber()
+  grabfood!: number;
+
+  @ApiProperty()
+  @IsNumber()
+  shopeefood!: number;
+
+  @ApiProperty()
   @IsString()
   note!: string;
+
+  @ApiProperty({
+    type: [Expenses],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => Expenses)
+  expenses!: Expenses[];
 }

@@ -19,6 +19,12 @@ export class UserController {
     return res;
   }
 
+  @Get('/report')
+  public async getReportUser() {
+    const res = await this.userService.getReportUser();
+    return res;
+  }
+
   @Get('/cabang')
   public async getCabang() {
     const res = await this.userService.getCabang();
@@ -29,8 +35,6 @@ export class UserController {
   public async changePassword(
     @Body() payload: { id: string; password: string },
   ) {
-    console.log(payload, 'ini payload');
-
     const res = await startTransaction(
       this.userService,
       'changePasswordTransaction',
@@ -65,10 +69,14 @@ export class UserController {
   }
 
   @Permission(['SUPER_USER'])
-  @Patch()
+  @Patch('/update')
   public async update(@Body() userUpdateDto: UpdateUserDto) {
-    await this.userService.update(userUpdateDto);
-    return 'Successfully! update User';
+    const res = await startTransaction(
+      this.userService,
+      'updateTransaction',
+      userUpdateDto,
+    );
+    return res;
   }
 
   @Put('/stock-cilok/:id')

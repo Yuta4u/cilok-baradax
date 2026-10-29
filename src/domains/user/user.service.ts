@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, ILike } from 'typeorm';
+import { DataSource, EntityManager, ILike, IsNull } from 'typeorm';
 import { UserEntity } from './user.entity';
 import bcrypt from 'bcrypt';
 import { CreateUserRequestDto } from './dtos/add-user.dto';
@@ -10,6 +10,19 @@ import { PERMISSION } from '../../constant';
 @Injectable()
 export class UserService {
   public constructor(private readonly dataSource: DataSource) {}
+
+  public async getReportUser() {
+    const userRepo = this.dataSource.getRepository(UserEntity);
+
+    const result = await userRepo.find({
+      withDeleted: false,
+      where: {
+        permission: 4,
+      },
+    });
+
+    return result;
+  }
 
   public async getCabang() {
     const userRepo = this.dataSource.getRepository(UserEntity);
@@ -83,17 +96,17 @@ export class UserService {
     return userRepo.save(user);
   }
 
-  public async update({ id, ...userUpdateDto }: UpdateUserDto) {
-    const userRepo = this.dataSource.getRepository(UserEntity);
-    if (userUpdateDto.password)
-      userUpdateDto.password = await bcrypt.hash(userUpdateDto.password, 10);
+  @Transactional('dataSource')
+  public async updateTransaction(
+    manager: EntityManager,
+    { id, ...userUpdateDto }: UpdateUserDto,
+  ) {
+    const userRepo = manager.getRepository(UserEntity);
+
     const user = await userRepo.update(
       { id },
       {
         ...userUpdateDto,
-        permission: userUpdateDto.permission
-          ? this.aggPermission(userUpdateDto.permission)
-          : undefined,
       },
     );
     return user;

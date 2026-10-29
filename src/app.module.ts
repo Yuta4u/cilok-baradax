@@ -8,6 +8,7 @@ import { AuthModule } from './domains/auth/auth.module';
 import CashFlowModule from './domains/cash-flow/cash-flow.module';
 import { CashFlowItemModule } from './domains/cash-flow-item/cash-flow-item.module';
 import { ExcelModule } from './domains/excel/excel.module';
+import { CashFlowOverheadModule } from './domains/cash-flow-overhead/cash-flow-overhead.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ExcelModule } from './domains/excel/excel.module';
     StockHistoriesModule,
     CashFlowModule,
     CashFlowItemModule,
+    CashFlowOverheadModule,
     ExcelModule,
   ],
 })

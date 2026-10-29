@@ -19,6 +19,6 @@ export class UpdateStock {
 
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'catatan tidak boleh kosong!' })
   public note!: string;
 }

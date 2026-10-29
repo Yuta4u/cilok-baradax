@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../database/base.entity';
 import { UserEntity } from '../user/user.entity';
 import { CashFlowItemEntity } from '../cash-flow-item/cash-flow-item.entity';
+import { CashFlowOverheadEntity } from '../cash-flow-overhead/cash-flow-overhead.entity';
 
 // cash-flow.entity.ts
 @Entity({
@@ -26,6 +27,34 @@ export class CashFlowEntity extends BaseEntity {
     nullable: true,
   })
   public note?: string;
+
+  @Column({
+    name: 'qris',
+    type: 'int',
+    default: 0,
+  })
+  public qris!: number;
+
+  @Column({
+    name: 'shopee_food',
+    type: 'int',
+    default: 0,
+  })
+  public shopeeFood!: number;
+
+  @Column({
+    name: 'grab_food',
+    type: 'int',
+    default: 0,
+  })
+  public grabFood!: number;
+
+  @Column({
+    name: 'go_food',
+    type: 'int',
+    default: 0,
+  })
+  public goFood!: number;
 
   @Column({
     name: 'overhead',
@@ -56,4 +85,9 @@ export class CashFlowEntity extends BaseEntity {
     cascade: true,
   })
   public cashFlowItems!: CashFlowItemEntity[];
+
+  @OneToMany(() => CashFlowOverheadEntity, (item) => item.cashFlow, {
+    cascade: true,
+  })
+  public cashFlowOverheads!: CashFlowOverheadEntity[];
 }
