@@ -53,6 +53,11 @@ export class CashFlowController {
     return res;
   }
 
+  @Get('/report/excel')
+  public async getReportExcel(@Query() query: BaseParams) {
+    return this.cashFlowService.getReportExcel(query);
+  }
+
   @Get('/detail/:id')
   public async getDetailById(@Param('id') id: string) {
     const res = await this.cashFlowService.getDetailById(id);
