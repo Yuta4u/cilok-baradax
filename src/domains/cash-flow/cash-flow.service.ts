@@ -632,21 +632,21 @@ export class CashFlowService {
     };
 
     const money = { numFmt: '"Rp" #,##0', alignment: { horizontal: 'right' } };
+    const plain = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+    // Layout follows the client's mock-up (Nov 10).
     const columns = [
       { header: 'TANGGAL', key: 'date' },
       { header: 'CABANG', key: 'userName' },
       { header: 'STATUS', key: 'status' },
-      { header: 'STOK AWAL', key: 'stockAwal', style: money },
-      { header: 'STOK SISA', key: 'stockSisa', style: money },
-      { header: 'TOTAL PENJUALAN', key: 'totalSales', style: money },
+      { header: 'STOK AWAL', key: 'stockAwal', style: plain },
+      { header: 'STOK SISA', key: 'stockSisa', style: plain },
+      { header: 'TUNAI', key: 'cash', style: money },
       { header: 'QRIS', key: 'qris', style: money },
       { header: 'SHOPEEFOOD', key: 'shopeeFood', style: money },
       { header: 'GRABFOOD', key: 'grabFood', style: money },
       { header: 'GOFOOD', key: 'goFood', style: money },
-      { header: 'TOTAL KANAL', key: 'kanal', style: money },
-      { header: 'TUNAI', key: 'cash', style: money },
       { header: 'PENGELUARAN', key: 'out', style: money },
-      { header: 'SISA CASH', key: 'sisaCash', style: money },
+      { header: 'TOTAL PENJUALAN', key: 'sisaCash', style: money },
       { header: 'CATATAN', key: 'note' },
     ];
     const header = columns.map((c) => c.header);
