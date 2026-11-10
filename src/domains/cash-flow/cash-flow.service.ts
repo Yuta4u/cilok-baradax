@@ -435,6 +435,37 @@ export class CashFlowService {
     };
   }
 
+  /**
+   * Report money math, per cash flow (matches the client's formula):
+   *   stok awal   = SUM(item.in  * price)
+   *   stok sisa   = SUM((item.in - item.out) * price)   (goes back to inventory)
+   *   penjualan   = stok awal - stok sisa = SUM(item.out * price)
+   *   kanal       = qris + shopee + grab + gofood
+   *   tunai       = penjualan - kanal
+   *   pengeluaran = SUM(cash_flow_overheads.amount), legacy cf.overhead fallback
+   *   sisa cash   = penjualan - kanal - pengeluaran
+   * Stok sisa is NOT an expense.
+   */
+  private static readonly REPORT_SQL = (() => {
+    const items = (expr: string) =>
+      `(SELECT COALESCE(SUM(${expr}), 0) FROM cash_flow_items cfi WHERE cfi.cash_flow_id = cf.id AND cfi.deleted_at IS NULL)`;
+    const awal = items('cfi."in" * cfi.price');
+    const sisa = items('(cfi."in" - COALESCE(cfi."out", 0)) * cfi.price');
+    const sales = items('COALESCE(cfi."out", 0) * cfi.price');
+    const kanal =
+      '(COALESCE(cf.qris, 0) + COALESCE(cf.shopee_food, 0) + COALESCE(cf.grab_food, 0) + COALESCE(cf.go_food, 0))';
+    const expense = `COALESCE(NULLIF((SELECT COALESCE(SUM(o.amount), 0) FROM cash_flow_overheads o WHERE o.cash_flow_overhead_id = cf.id AND o.deleted_at IS NULL), 0), cf.overhead, 0)`;
+    return {
+      awal,
+      sisa,
+      sales,
+      kanal,
+      expense,
+      cash: `(${sales} - ${kanal})`,
+      sisaCash: `(${sales} - ${kanal} - ${expense})`,
+    };
+  })();
+
   /** Shared filters for the sales report list and its Excel export. */
   private buildReportQuery(query: BaseParams) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
@@ -480,14 +511,15 @@ export class CashFlowService {
     const limit = Math.max(1, Number(query.limit) || 10);
 
     const qb = this.buildReportQuery(query);
+    const R = CashFlowService.REPORT_SQL;
 
     const dataQuery = qb
       .clone()
       .select([
         'cf.id AS id',
-        'cf.in AS cash',
+        `${R.cash} AS cash`,
         'cf.createdAt AS "createdAt"',
-        'cf.out AS out',
+        `${R.expense} AS out`,
         'cf.qris AS qris',
         'cf.shopeeFood AS "shopeeFood"',
         'cf.goFood AS "goFood"',
@@ -495,13 +527,10 @@ export class CashFlowService {
         'u.id AS "userId"',
         'u.name AS "userName"',
         'cf.verified AS verified',
-        `(
-        COALESCE(cf.in, 0) +
-        COALESCE(cf.qris, 0) +
-        COALESCE(cf.shopeeFood, 0) +
-        COALESCE(cf.goFood, 0) +
-        COALESCE(cf.grabFood, 0)
-      ) AS "totalSales"`,
+        `${R.awal} AS "stockAwal"`,
+        `${R.sisa} AS "stockSisa"`,
+        `${R.sales} AS "totalSales"`,
+        `${R.sisaCash} AS "sisaCash"`,
       ])
       .orderBy('cf.createdAt', 'DESC')
       .addOrderBy('cf.id', 'DESC')
@@ -512,8 +541,8 @@ export class CashFlowService {
     const summaryQuery = qb
       .clone()
       .select([
-        `COALESCE(SUM(cf.in), 0) AS "totalCash"`,
-        `COALESCE(SUM(cf.out), 0) AS "totalOut"`,
+        `COALESCE(SUM(${R.cash}), 0) AS "totalCash"`,
+        `COALESCE(SUM(${R.expense}), 0) AS "totalOut"`,
         `COALESCE(SUM(cf.qris), 0) AS "totalQris"`,
         `COALESCE(
         SUM(
@@ -522,23 +551,33 @@ export class CashFlowService {
           COALESCE(cf.grabFood, 0)
         ), 0
       ) AS "totalOnline"`,
-        `COALESCE(
-        SUM(
-          COALESCE(cf.in, 0) +
-          COALESCE(cf.qris, 0) +
-          COALESCE(cf.shopeeFood, 0) +
-          COALESCE(cf.goFood, 0) +
-          COALESCE(cf.grabFood, 0)
-        ), 0
-      ) AS "totalSales"`,
+        `COALESCE(SUM(${R.sales}), 0) AS "totalSales"`,
+        `COALESCE(SUM(${R.sisaCash}), 0) AS "totalSisaCash"`,
       ])
       .andWhere('cf.verified = :verified', { verified: 0 });
 
-    const [data, totalItems, summary] = await Promise.all([
+    const [rawData, totalItems, summary] = await Promise.all([
       dataQuery.getRawMany(),
       qb.clone().getCount(),
       summaryQuery.getRawOne(),
     ]);
+
+    const num = [
+      'cash',
+      'out',
+      'qris',
+      'shopeeFood',
+      'goFood',
+      'grabFood',
+      'stockAwal',
+      'stockSisa',
+      'totalSales',
+      'sisaCash',
+    ];
+    const data = rawData.map((r: Record<string, unknown>) => {
+      for (const k of num) r[k] = Number(r[k] ?? 0);
+      return r;
+    });
 
     return {
       data,
@@ -553,30 +592,30 @@ export class CashFlowService {
           totalQris: Number(summary.totalQris),
           totalOnline: Number(summary.totalOnline),
           totalOut: Number(summary.totalOut),
+          totalSisaCash: Number(summary.totalSisaCash),
         },
       },
     };
   }
 
   public async getReportExcel(query: BaseParams) {
+    const R = CashFlowService.REPORT_SQL;
     const rows = await this.buildReportQuery(query)
       .select([
         'cf.createdAt AS "createdAt"',
         'u.name AS "userName"',
         'cf.verified AS verified',
-        'COALESCE(cf.in, 0) AS cash',
+        `${R.awal} AS "stockAwal"`,
+        `${R.sisa} AS "stockSisa"`,
+        `${R.sales} AS "totalSales"`,
         'COALESCE(cf.qris, 0) AS qris',
         'COALESCE(cf.shopeeFood, 0) AS "shopeeFood"',
         'COALESCE(cf.grabFood, 0) AS "grabFood"',
         'COALESCE(cf.goFood, 0) AS "goFood"',
-        'COALESCE(cf.out, 0) AS out',
-        `(
-          COALESCE(cf.in, 0) +
-          COALESCE(cf.qris, 0) +
-          COALESCE(cf.shopeeFood, 0) +
-          COALESCE(cf.goFood, 0) +
-          COALESCE(cf.grabFood, 0)
-        ) AS "totalSales"`,
+        `${R.kanal} AS kanal`,
+        `${R.cash} AS cash`,
+        `${R.expense} AS out`,
+        `${R.sisaCash} AS "sisaCash"`,
         'cf.note AS note',
       ])
       .orderBy('cf.createdAt', 'DESC')
@@ -597,13 +636,17 @@ export class CashFlowService {
       { header: 'TANGGAL', key: 'date' },
       { header: 'CABANG', key: 'userName' },
       { header: 'STATUS', key: 'status' },
-      { header: 'TUNAI', key: 'cash', style: money },
+      { header: 'STOK AWAL', key: 'stockAwal', style: money },
+      { header: 'STOK SISA', key: 'stockSisa', style: money },
+      { header: 'TOTAL PENJUALAN', key: 'totalSales', style: money },
       { header: 'QRIS', key: 'qris', style: money },
       { header: 'SHOPEEFOOD', key: 'shopeeFood', style: money },
       { header: 'GRABFOOD', key: 'grabFood', style: money },
       { header: 'GOFOOD', key: 'goFood', style: money },
-      { header: 'KELUAR', key: 'out', style: money },
-      { header: 'TOTAL PENJUALAN', key: 'totalSales', style: money },
+      { header: 'TOTAL KANAL', key: 'kanal', style: money },
+      { header: 'TUNAI', key: 'cash', style: money },
+      { header: 'PENGELUARAN', key: 'out', style: money },
+      { header: 'SISA CASH', key: 'sisaCash', style: money },
       { header: 'CATATAN', key: 'note' },
     ];
     const header = columns.map((c) => c.header);
@@ -623,13 +666,17 @@ export class CashFlowService {
       date: wib.format(new Date(r.createdAt as string)),
       userName: r.userName ?? '',
       status: STATUS[Number(r.verified)] ?? '',
-      cash: Number(r.cash),
+      stockAwal: Number(r.stockAwal),
+      stockSisa: Number(r.stockSisa),
+      totalSales: Number(r.totalSales),
       qris: Number(r.qris),
       shopeeFood: Number(r.shopeeFood),
       grabFood: Number(r.grabFood),
       goFood: Number(r.goFood),
+      kanal: Number(r.kanal),
+      cash: Number(r.cash),
       out: Number(r.out),
-      totalSales: Number(r.totalSales),
+      sisaCash: Number(r.sisaCash),
       note: r.note ?? '',
     });
 
