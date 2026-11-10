@@ -32,7 +32,7 @@ export class ProductService {
         'p.id as id',
         'p.name as name',
         'p.stock as stock',
-        'p.minimalStock as minimalStock',
+        'p.minimalStock as "minimalStock"',
         'p.uom as uom',
         'p.price as price',
         'CASE WHEN p.stock >= p.minimalStock THEN true ELSE false END as status',
@@ -160,7 +160,7 @@ export class ProductService {
 
     const product = await productRepo.findOne({
       where: { id: payload.id },
-      select: ['id', 'stock'],
+      select: ['id', 'stock', 'minimalStock'],
       lock: { mode: 'pessimistic_write' },
     });
 
@@ -169,22 +169,28 @@ export class ProductService {
     }
 
     const previousStock = Number(product.stock);
-    const diff = payload.newStock - previousStock;
+    const previousMinimalStock = Number(product.minimalStock);
+    const newStock = payload.newStock ?? previousStock;
+    const minimalStock = payload.minimalStock ?? previousMinimalStock;
+    const diff = newStock - previousStock;
 
-    if (diff === 0) {
-      throw new BadRequestException(
-        `Stok baru sama dengan stok saat ini (${previousStock}).`,
-      );
+    if (diff === 0 && minimalStock === previousMinimalStock) {
+      throw new BadRequestException('Tidak ada perubahan stok.');
     }
 
-    await productRepo.update({ id: payload.id }, { stock: payload.newStock });
+    await productRepo.update(
+      { id: payload.id },
+      { stock: newStock, minimalStock },
+    );
 
-    await this.stockHistoryService.createTransaction(manager, {
-      productId: payload.id,
-      qty: Math.abs(diff),
-      type: diff > 0 ? 'in' : 'out',
-      note: payload.note?.trim() || 'Koreksi stok',
-    });
+    if (diff !== 0) {
+      await this.stockHistoryService.createTransaction(manager, {
+        productId: payload.id,
+        qty: Math.abs(diff),
+        type: diff > 0 ? 'in' : 'out',
+        note: payload.note?.trim() || 'Koreksi stok',
+      });
+    }
 
     return {
       statusCode: 200,
@@ -192,7 +198,9 @@ export class ProductService {
       data: {
         id: payload.id,
         previousStock,
-        stock: payload.newStock,
+        stock: newStock,
+        previousMinimalStock,
+        minimalStock,
       },
     };
   }

@@ -435,11 +435,9 @@ export class CashFlowService {
     };
   }
 
-  public async getReport(query: BaseParams) {
+  /** Shared filters for the sales report list and its Excel export. */
+  private buildReportQuery(query: BaseParams) {
     const cashFlowRepo = this.dataSource.getRepository(CashFlowEntity);
-
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.max(1, Number(query.limit) || 10);
 
     const qb = cashFlowRepo.createQueryBuilder('cf').leftJoin('cf.user', 'u');
 
@@ -466,6 +464,22 @@ export class CashFlowService {
     } else if (query.type === 'EXPENSE') {
       qb.andWhere('COALESCE(cf.out, 0) > 0');
     }
+
+    const search = query.q?.trim();
+    if (search) {
+      qb.andWhere('(u.name ILIKE :search OR cf.note ILIKE :search)', {
+        search: `%${search}%`,
+      });
+    }
+
+    return qb;
+  }
+
+  public async getReport(query: BaseParams) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Number(query.limit) || 10);
+
+    const qb = this.buildReportQuery(query);
 
     const dataQuery = qb
       .clone()
@@ -518,7 +532,7 @@ export class CashFlowService {
         ), 0
       ) AS "totalSales"`,
       ])
-      .where('cf.verified = :verified', { verified: 0 });
+      .andWhere('cf.verified = :verified', { verified: 0 });
 
     const [data, totalItems, summary] = await Promise.all([
       dataQuery.getRawMany(),
@@ -542,6 +556,92 @@ export class CashFlowService {
         },
       },
     };
+  }
+
+  public async getReportExcel(query: BaseParams) {
+    const rows = await this.buildReportQuery(query)
+      .select([
+        'cf.createdAt AS "createdAt"',
+        'u.name AS "userName"',
+        'cf.verified AS verified',
+        'COALESCE(cf.in, 0) AS cash',
+        'COALESCE(cf.qris, 0) AS qris',
+        'COALESCE(cf.shopeeFood, 0) AS "shopeeFood"',
+        'COALESCE(cf.grabFood, 0) AS "grabFood"',
+        'COALESCE(cf.goFood, 0) AS "goFood"',
+        'COALESCE(cf.out, 0) AS out',
+        `(
+          COALESCE(cf.in, 0) +
+          COALESCE(cf.qris, 0) +
+          COALESCE(cf.shopeeFood, 0) +
+          COALESCE(cf.goFood, 0) +
+          COALESCE(cf.grabFood, 0)
+        ) AS "totalSales"`,
+        'cf.note AS note',
+      ])
+      .orderBy('cf.createdAt', 'DESC')
+      .getRawMany();
+
+    if (rows.length === 0) {
+      throw new BadRequestException('Tidak ada data untuk diexport');
+    }
+
+    const STATUS: Record<number, string> = {
+      0: 'Approved',
+      1: 'Menunggu Approval',
+      2: 'Pending',
+    };
+
+    const money = { numFmt: '"Rp" #,##0', alignment: { horizontal: 'right' } };
+    const columns = [
+      { header: 'TANGGAL', key: 'date' },
+      { header: 'CABANG', key: 'userName' },
+      { header: 'STATUS', key: 'status' },
+      { header: 'TUNAI', key: 'cash', style: money },
+      { header: 'QRIS', key: 'qris', style: money },
+      { header: 'SHOPEEFOOD', key: 'shopeeFood', style: money },
+      { header: 'GRABFOOD', key: 'grabFood', style: money },
+      { header: 'GOFOOD', key: 'goFood', style: money },
+      { header: 'KELUAR', key: 'out', style: money },
+      { header: 'TOTAL PENJUALAN', key: 'totalSales', style: money },
+      { header: 'CATATAN', key: 'note' },
+    ];
+    const header = columns.map((c) => c.header);
+
+    // Server runs in UTC; show times in WIB like the app does.
+    const wib = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    const rowContent = (r: Record<string, unknown>) => ({
+      date: wib.format(new Date(r.createdAt as string)),
+      userName: r.userName ?? '',
+      status: STATUS[Number(r.verified)] ?? '',
+      cash: Number(r.cash),
+      qris: Number(r.qris),
+      shopeeFood: Number(r.shopeeFood),
+      grabFood: Number(r.grabFood),
+      goFood: Number(r.goFood),
+      out: Number(r.out),
+      totalSales: Number(r.totalSales),
+      note: r.note ?? '',
+    });
+
+    return this.excelService.generateDataExcel(
+      rows,
+      'Laporan Penjualan',
+      columns as Partial<ExcelJs.Column>[],
+      { sd: query.sd ?? '-', ed: query.ed ?? '-' },
+      header,
+      'Laporan Penjualan',
+      rowContent,
+    );
   }
 
   public async getView(id: string) {
