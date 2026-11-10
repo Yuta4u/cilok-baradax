@@ -236,7 +236,9 @@ export class ExcelService {
       let maxLength = 10;
       column.eachCell?.({ includeEmpty: true }, (cell, rowNumber) => {
         if (rowNumber < startRow) return;
-        const cellValue = cell.value ? cell.value.toString() : '';
+        const cellValue = typeof cell.value === 'number'
+          ? `${cell.numFmt?.includes('Rp') ? 'Rp ' : ''}${cell.value.toLocaleString('id-ID')}`
+          : cell.value?.toString() || '';
         maxLength = Math.max(maxLength, cellValue.length + 2);
       });
       column.width = maxLength;
@@ -286,6 +288,7 @@ export class ExcelService {
     // Add generated date
     const generatedRow = worksheet.addRow([
       `Generated on: ${new Date().toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Jakarta',
         year: 'numeric',
         month: 'long',
         day: 'numeric',
