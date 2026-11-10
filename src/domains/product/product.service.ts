@@ -32,7 +32,7 @@ export class ProductService {
         'p.id as id',
         'p.name as name',
         'p.stock as stock',
-        'p.minimalStock as minimalStock',
+        'p.minimalStock as "minimalStock"',
         'p.uom as uom',
         'p.price as price',
         'CASE WHEN p.stock >= p.minimalStock THEN true ELSE false END as status',
