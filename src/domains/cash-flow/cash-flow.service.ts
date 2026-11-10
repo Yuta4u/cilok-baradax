@@ -467,6 +467,13 @@ export class CashFlowService {
       qb.andWhere('COALESCE(cf.out, 0) > 0');
     }
 
+    const search = query.q?.trim();
+    if (search) {
+      qb.andWhere('(u.name ILIKE :search OR cf.note ILIKE :search)', {
+        search: `%${search}%`,
+      });
+    }
+
     const dataQuery = qb
       .clone()
       .select([
@@ -518,7 +525,7 @@ export class CashFlowService {
         ), 0
       ) AS "totalSales"`,
       ])
-      .where('cf.verified = :verified', { verified: 0 });
+      .andWhere('cf.verified = :verified', { verified: 0 });
 
     const [data, totalItems, summary] = await Promise.all([
       dataQuery.getRawMany(),
